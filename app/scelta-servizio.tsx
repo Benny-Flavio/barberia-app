@@ -3,7 +3,6 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -61,9 +60,6 @@ export default function SceltaServizio() {
       .catch((err) => {
         console.log("Errore:", err);
         setLoading(false);
-        if (Platform.OS === "web") {
-          window.alert("Impossibile caricare i servizi. Controlla il server!");
-        }
       });
   }, []);
 

@@ -7,7 +7,6 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Image,
-  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -30,6 +29,7 @@ export default function Home() {
   const [showPw, setShowPw] = useState(false);
   const [vecchiaPw, setVecchiaPw] = useState("");
   const [nuovaPw, setNuovaPw] = useState("");
+  const [pwErrore, setPwErrore] = useState("");
   const [nonLette, setNonLette] = useState(0);
   const [numAppuntamenti, setNumAppuntamenti] = useState(0);
   const [appDomani, setAppDomani] = useState<any[]>([]);
@@ -222,9 +222,6 @@ export default function Home() {
   };
 
   const logout = async () => {
-    if (Platform.OS === "web") {
-      if (!window.confirm("Sei sicuro di voler uscire?")) return;
-    }
     await supabase.auth.signOut();
     await AsyncStorage.removeItem("token");
     await AsyncStorage.removeItem("utente");
@@ -252,7 +249,6 @@ export default function Home() {
         await AsyncStorage.setItem("utente", JSON.stringify(nu));
         setUtente(nu);
         setEditMode(false);
-        Platform.OS === "web" ? window.alert("Profilo aggiornato!") : null;
       }
     } catch (err) {}
   };
@@ -260,7 +256,7 @@ export default function Home() {
   const cambiaPw = async () => {
     if (!vecchiaPw || !nuovaPw) return;
     if (nuovaPw.length < 6) {
-      Platform.OS === "web" ? window.alert("Minimo 6 caratteri") : null;
+      setPwErrore("Minimo 6 caratteri");
       return;
     }
     try {
@@ -282,9 +278,9 @@ export default function Home() {
         setShowPw(false);
         setVecchiaPw("");
         setNuovaPw("");
-        Platform.OS === "web" ? window.alert("Password cambiata!") : null;
+        setPwErrore("");
       } else {
-        Platform.OS === "web" ? window.alert(data.error) : null;
+        setPwErrore(data.error || "Errore. Riprova.");
       }
     } catch (err) {}
   };
@@ -591,6 +587,9 @@ export default function Home() {
                   placeholderTextColor="#333"
                   secureTextEntry
                 />
+                {pwErrore ? (
+                  <Text style={{ color: "#F44336", fontSize: 12, marginTop: 6, marginBottom: 2 }}>{pwErrore}</Text>
+                ) : null}
                 <View style={s.btnRow}>
                   <Pressable
                     style={s.btnCancel}
@@ -598,6 +597,7 @@ export default function Home() {
                       setShowPw(false);
                       setVecchiaPw("");
                       setNuovaPw("");
+                      setPwErrore("");
                     }}
                   >
                     <Text style={s.btnCancelText}>Annulla</Text>

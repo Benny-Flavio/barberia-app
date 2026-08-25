@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
-  Platform,
   Pressable,
   SafeAreaView,
   Text,
@@ -69,9 +68,6 @@ export default function MieiAppuntamenti() {
   };
 
   const cancella = async (id: number) => {
-    if (Platform.OS === "web") {
-      if (!window.confirm("Cancellare questo appuntamento?")) return;
-    }
     try {
       const tkn = await getToken();
       await fetch(`${BACKEND_URL}/api/prenotazioni/${id}`, {

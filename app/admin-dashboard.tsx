@@ -2,10 +2,8 @@ import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Dimensions,
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -350,6 +348,8 @@ export default function AdminDashboard() {
   const [nonLetteAdmin, setNonLetteAdmin] = useState(0);
   const [activeTab, setActiveTab] = useState<"home" | "agenda">("home");
   const [appDetail, setAppDetail] = useState<any>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<any>(null);
   const sheetAnim = useRef(new Animated.Value(SHEET_H)).current;
   const overlayOp = useRef(new Animated.Value(0)).current;
   const headerOp = useRef(new Animated.Value(0)).current;
@@ -372,7 +372,9 @@ export default function AdminDashboard() {
   };
 
   const msg = (m: string) => {
-    Platform.OS === "web" ? window.alert(m) : Alert.alert("Info", m);
+    setToast(m);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2500);
   };
 
   useEffect(() => {
@@ -458,9 +460,6 @@ export default function AdminDashboard() {
     } catch (err) {}
   };
   const cancella = async (id: number) => {
-    if (Platform.OS === "web") {
-      if (!window.confirm("Cancellare questo appuntamento?")) return;
-    }
     try {
       await fetchAuth(`${BACKEND_URL}/api/admin/prenotazioni/${id}`, {
         method: "DELETE",
@@ -717,9 +716,6 @@ export default function AdminDashboard() {
     }
   };
   const logout = async () => {
-    if (Platform.OS === "web") {
-      if (!window.confirm("Sei sicuro di voler uscire?")) return;
-    }
     await supabase.auth.signOut();
     router.replace("/");
   };
@@ -2274,6 +2270,13 @@ export default function AdminDashboard() {
             <Pressable style={[st.mCancel, { marginTop: 12 }]} onPress={() => setAppDetail(null)}>
               <Text style={{ color: "#666", fontWeight: "700", fontSize: 14, textAlign: "center" }}>Chiudi</Text>
             </Pressable>
+          </View>
+        </View>
+      )}
+      {toast !== null && (
+        <View style={{ position: "absolute", bottom: 48, left: 24, right: 24, alignItems: "center", zIndex: 9999 }} pointerEvents="none">
+          <View style={{ backgroundColor: "#1C1C1C", borderRadius: 12, paddingHorizontal: 22, paddingVertical: 11, borderWidth: 1, borderColor: "#D4AF37", shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 8, elevation: 8 }}>
+            <Text style={{ color: "#EEE", fontWeight: "600", fontSize: 14, textAlign: "center" }}>{toast}</Text>
           </View>
         </View>
       )}

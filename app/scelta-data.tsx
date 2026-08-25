@@ -4,9 +4,7 @@ import { supabase } from "../lib/supabase";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -74,6 +72,8 @@ export default function SceltaData() {
   const [loadingOrari, setLoadingOrari] = useState(false);
   const [loadingBarbieri, setLoadingBarbieri] = useState(false);
   const [invioInCorso, setInvioInCorso] = useState(false);
+  const [errore, setErrore] = useState("");
+  const [barbieriMsg, setBarbieriMsg] = useState("");
 
   const headerOpacity = useRef(new Animated.Value(0)).current;
   const step2Opacity = useRef(new Animated.Value(0)).current;
@@ -100,6 +100,8 @@ export default function SceltaData() {
     setBarbiereSelezionato(null);
     setOraSelezionata("");
     setOrariDisponibili([]);
+    setBarbieriMsg("");
+    setErrore("");
 
     fetch(
       `${BACKEND_URL}/api/barbieri-disponibili?sede_id=${sede_id}&data=${dataSelezionata}`,
@@ -108,9 +110,7 @@ export default function SceltaData() {
       .then((data) => {
         if (data.messaggio) {
           setBarbieri([]);
-          Platform.OS === "web"
-            ? window.alert(data.messaggio)
-            : Alert.alert("Chiuso", data.messaggio);
+          setBarbieriMsg(data.messaggio);
         } else {
           setBarbieri(data);
           Animated.timing(step2Opacity, {
@@ -183,10 +183,7 @@ export default function SceltaData() {
 
   const confermaPrenotazione = async () => {
     if (!dataSelezionata || !oraSelezionata || !barbiereSelezionato) {
-      const msg = "Scegli una data, un barbiere e un orario.";
-      Platform.OS === "web"
-        ? window.alert(msg)
-        : Alert.alert("Attenzione", msg);
+      setErrore("Scegli una data, un barbiere e un orario.");
       return;
     }
     setInvioInCorso(true);
@@ -216,37 +213,15 @@ export default function SceltaData() {
       const result = await response.json();
       if (result.success) {
         await AsyncStorage.removeItem("appuntamenti_visti");
-        const msg = `${servizio_nome} con ${barbiereSelezionato.nome}\n${dataSelezionata} alle ${oraSelezionata}`;
-        if (Platform.OS === "web") {
-          window.alert("Confermato! 🎉\n\n" + msg);
-          router.push({
-            pathname: "/home",
-            params: { sede_id: String(sede_id), nome_sede: String(nome_sede) },
-          });
-        } else {
-          Alert.alert("Confermato! 🎉", msg, [
-            {
-              text: "OK",
-              onPress: () =>
-                router.push({
-                  pathname: "/home",
-                  params: {
-                    sede_id: String(sede_id),
-                    nome_sede: String(nome_sede),
-                  },
-                }),
-            },
-          ]);
-        }
+        router.push({
+          pathname: "/home",
+          params: { sede_id: String(sede_id), nome_sede: String(nome_sede) },
+        });
       } else {
-        const err = result.error || "Impossibile salvare.";
-        Platform.OS === "web"
-          ? window.alert("Errore: " + err)
-          : Alert.alert("Errore", err);
+        setErrore(result.error || "Impossibile salvare.");
       }
     } catch (error) {
-      const msg = "Impossibile collegarsi al server.";
-      Platform.OS === "web" ? window.alert(msg) : Alert.alert("Errore", msg);
+      setErrore("Impossibile collegarsi al server.");
     } finally {
       setInvioInCorso(false);
     }
@@ -341,7 +316,7 @@ export default function SceltaData() {
                 style={{ marginVertical: 20 }}
               />
             ) : barbieri.length === 0 ? (
-              <Text style={styles.emptyText}>Nessun barbiere disponibile</Text>
+              <Text style={styles.emptyText}>{barbieriMsg || "Nessun barbiere disponibile"}</Text>
             ) : (
               <ScrollView
                 horizontal
@@ -492,6 +467,9 @@ export default function SceltaData() {
               <Text style={styles.riepilogoValue}>{oraSelezionata}</Text>
             </View>
 
+            {errore ? (
+              <Text style={{ color: "#F44336", fontSize: 13, textAlign: "center", marginBottom: 8 }}>{errore}</Text>
+            ) : null}
             <Pressable
               style={[
                 styles.confirmBtn,
