@@ -16,6 +16,7 @@ import {
 
 // IMPORTIAMO GLI STILI SEPARATI E LA COSTANTE SHEET_H
 import { s, SHEET_H } from "../styles/homeStyles";
+import GuidaInstallazione from "../components/GuidaInstallazione";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
 
@@ -627,6 +628,7 @@ export default function Home() {
       )}
 
       <StatusBar style="light" />
+      <GuidaInstallazione userId={utente?.uuid || ""} />
     </View>
   );
 }

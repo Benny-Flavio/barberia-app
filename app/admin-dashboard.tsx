@@ -16,6 +16,7 @@ import { Calendar, LocaleConfig } from "react-native-calendars";
 // IMPORTIAMO GLI STILI E LA COSTANTE
 import { SHEET_H, st } from "../styles/adminDashboardStyles";
 import { supabase } from "../lib/supabase";
+import GuidaInstallazione from "../components/GuidaInstallazione";
 
 LocaleConfig.locales["it"] = {
   monthNames: [
@@ -2274,12 +2275,13 @@ export default function AdminDashboard() {
         </View>
       )}
       {toast !== null && (
-        <View style={{ position: "absolute", bottom: 48, left: 24, right: 24, alignItems: "center", zIndex: 9999 }} pointerEvents="none">
+        <View style={{ position: "absolute", bottom: 48, left: 24, right: 24, alignItems: "center", zIndex: 9998 }} pointerEvents="none">
           <View style={{ backgroundColor: "#1C1C1C", borderRadius: 12, paddingHorizontal: 22, paddingVertical: 11, borderWidth: 1, borderColor: "#D4AF37", shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 8, elevation: 8 }}>
             <Text style={{ color: "#EEE", fontWeight: "600", fontSize: 14, textAlign: "center" }}>{toast}</Text>
           </View>
         </View>
       )}
+      <GuidaInstallazione userId={utente?.id?.toString() || ""} />
     </SafeAreaView>
   );
 }
