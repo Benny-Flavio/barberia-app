@@ -11,29 +11,29 @@ interface Props {
 
 const PASSI: Record<Piattaforma, string[]> = {
   ios: [
-    "Assicurati di aprire questo sito con Safari (non Chrome o altri browser)",
-    "Tocca l'icona Condividi (□↑) nella barra in basso dello schermo",
-    'Scorri il menu e tocca "Aggiungi a schermata Home"',
-    'Puoi rinominare l\'app, poi tocca "Aggiungi" in alto a destra',
-    "L'app Bulldog Barber Shop apparirà nella tua schermata Home!",
+    "Assicurati di aprire questo sito con **Safari** (non Chrome o altri browser)",
+    "Tocca l'icona Condividi **(□↑)** nella barra in basso dello schermo",
+    "Scorri il menu e tocca **\"Aggiungi a schermata Home\"**",
+    "Puoi rinominare l'app, poi tocca **\"Aggiungi\"** in alto a destra",
+    "L'app **Bulldog Barber Shop** apparirà nella tua schermata Home!",
   ],
   android: [
-    "Assicurati di aprire questo sito con Google Chrome",
-    "Tocca i tre puntini in alto a destra nella barra del browser",
-    'Tocca "Aggiungi a schermata Home" oppure "Installa app"',
-    'Tocca "Aggiungi" per confermare — l\'app è installata!',
+    "Assicurati di aprire questo sito con **Google Chrome**",
+    "Tocca i **tre puntini ⋮** in alto a destra nella barra del browser",
+    "Tocca **\"Aggiungi a schermata Home\"** oppure **\"Installa app\"**",
+    "Tocca **\"Aggiungi\"** per confermare — l'app è installata!",
   ],
   windows: [
-    "Apri questo sito su Chrome o Microsoft Edge",
-    "Chrome: clicca i tre puntini ⋮ in alto a destra → cerca \"Salva e condividi\" → \"Installa come app\"\nEdge: clicca i tre puntini ... → cerca \"App\" → \"Installa questo sito come app\"",
-    "Dai un nome all'app e clicca \"Installa\"",
-    "Troverai l'app sul Desktop e nel menu Start!",
+    "Apri questo sito su **Chrome** o **Microsoft Edge**",
+    "**Chrome:** clicca i **tre puntini ⋮** in alto a destra → cerca **\"Salva e condividi\"** → **\"Installa come app\"**\n**Edge:** clicca i **tre puntini ...** → cerca **\"App\"** → **\"Installa questo sito come app\"**",
+    "Dai un nome all'app e clicca **\"Installa\"**",
+    "Troverai l'app sul **Desktop** e nel **menu Start**!",
   ],
   mac: [
-    "Apri questo sito su Chrome o Safari",
-    "Chrome: clicca sull'icona ⊕ nella barra degli indirizzi\nSafari: vai su File → Aggiungi al Dock",
-    'Clicca su "Installa" o "Aggiungi"',
-    "L'app apparirà nel tuo Dock e nel Launchpad!",
+    "Apri questo sito su **Chrome** o **Safari**",
+    "**Chrome:** clicca sull'icona **⊕** nella barra degli indirizzi\n**Safari:** vai su **File** → **\"Aggiungi al Dock\"**",
+    "Clicca su **\"Installa\"** o **\"Aggiungi\"**",
+    "L'app apparirà nel tuo **Dock** e nel **Launchpad**!",
   ],
 };
 
@@ -42,6 +42,19 @@ const LABEL_PIATTAFORMA: Record<Piattaforma, string> = {
   android: "Android",
   windows: "Windows",
   mac: "Mac",
+};
+
+const renderBold = (text: string) => {
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return (
+    <Text style={{ color: "#CCC", fontSize: 14, lineHeight: 21 }}>
+      {parts.map((part, i) =>
+        i % 2 === 1
+          ? <Text key={i} style={{ fontWeight: "800", color: "#FFF" }}>{part}</Text>
+          : part
+      )}
+    </Text>
+  );
 };
 
 export default function GuidaInstallazione({ userId }: Props) {
@@ -174,7 +187,7 @@ export default function GuidaInstallazione({ userId }: Props) {
                 }}>
                   <Text style={{ color: "#D4AF37", fontWeight: "800", fontSize: 13 }}>{i + 1}</Text>
                 </View>
-                <Text style={{ flex: 1, color: "#CCC", fontSize: 14, lineHeight: 21 }}>{testo}</Text>
+                <View style={{ flex: 1 }}>{renderBold(testo)}</View>
               </View>
             ))}
           </View>
