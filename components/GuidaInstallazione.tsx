@@ -9,31 +9,31 @@ interface Props {
   userId: string;
 }
 
-const PASSI: Record<Piattaforma, { emoji: string; testo: string }[]> = {
+const PASSI: Record<Piattaforma, string[]> = {
   ios: [
-    { emoji: "🔍", testo: "Assicurati di aprire questo sito con Safari (non Chrome o altri browser)" },
-    { emoji: "📤", testo: 'Tocca l\'icona Condividi (□↑) nella barra in basso dello schermo' },
-    { emoji: "📋", testo: 'Scorri il menu e tocca "Aggiungi a schermata Home"' },
-    { emoji: "✏️", testo: 'Puoi rinominare l\'app, poi tocca "Aggiungi" in alto a destra' },
-    { emoji: "✅", testo: "L'app Bulldog Barber Shop apparirà nella tua schermata Home!" },
+    "Assicurati di aprire questo sito con Safari (non Chrome o altri browser)",
+    "Tocca l'icona Condividi (□↑) nella barra in basso dello schermo",
+    'Scorri il menu e tocca "Aggiungi a schermata Home"',
+    'Puoi rinominare l\'app, poi tocca "Aggiungi" in alto a destra',
+    "L'app Bulldog Barber Shop apparirà nella tua schermata Home!",
   ],
   android: [
-    { emoji: "🌐", testo: "Assicurati di aprire questo sito con Google Chrome" },
-    { emoji: "⋮", testo: "Tocca i tre puntini in alto a destra nella barra del browser" },
-    { emoji: "📲", testo: 'Tocca "Aggiungi a schermata Home" oppure "Installa app"' },
-    { emoji: "✅", testo: 'Tocca "Aggiungi" per confermare — l\'app è installata!' },
+    "Assicurati di aprire questo sito con Google Chrome",
+    "Tocca i tre puntini in alto a destra nella barra del browser",
+    'Tocca "Aggiungi a schermata Home" oppure "Installa app"',
+    'Tocca "Aggiungi" per confermare — l\'app è installata!',
   ],
   windows: [
-    { emoji: "🌐", testo: "Apri questo sito su Chrome o Microsoft Edge" },
-    { emoji: "📥", testo: "Clicca sull'icona ⊕ nella barra degli indirizzi (in alto a destra)" },
-    { emoji: "🖥️", testo: 'Seleziona "Installa Bulldog Barber Shop"' },
-    { emoji: "✅", testo: "Clicca Installa — troverai l'app nel menu Start e sul Desktop!" },
+    "Apri questo sito su Chrome o Microsoft Edge",
+    "Clicca sull'icona ⊕ nella barra degli indirizzi (in alto a destra)",
+    'Seleziona "Installa Bulldog Barber Shop"',
+    "Clicca Installa — troverai l'app nel menu Start e sul Desktop!",
   ],
   mac: [
-    { emoji: "🌐", testo: "Apri questo sito su Chrome o Safari" },
-    { emoji: "📥", testo: "Chrome: clicca sull'icona ⊕ nella barra degli indirizzi\nSafari: vai su File → Aggiungi al Dock" },
-    { emoji: "🖥️", testo: 'Clicca su "Installa" o "Aggiungi"' },
-    { emoji: "✅", testo: "L'app apparirà nel tuo Dock e nel Launchpad!" },
+    "Apri questo sito su Chrome o Safari",
+    "Chrome: clicca sull'icona ⊕ nella barra degli indirizzi\nSafari: vai su File → Aggiungi al Dock",
+    'Clicca su "Installa" o "Aggiungi"',
+    "L'app apparirà nel tuo Dock e nel Launchpad!",
   ],
 };
 
@@ -165,19 +165,16 @@ export default function GuidaInstallazione({ userId }: Props) {
 
           {/* PASSI */}
           <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-            {passi.map((passo, i) => (
-              <View key={i} style={{ flexDirection: "row", marginBottom: 14, alignItems: "flex-start" }}>
+            {passi.map((testo, i) => (
+              <View key={i} style={{ flexDirection: "row", marginBottom: 16, alignItems: "flex-start" }}>
                 <View style={{
-                  width: 32, height: 32, borderRadius: 16,
+                  width: 28, height: 28, borderRadius: 14,
                   backgroundColor: "#1A1A1A", borderWidth: 1.5, borderColor: "#D4AF37",
-                  justifyContent: "center", alignItems: "center", marginRight: 12, flexShrink: 0,
+                  justifyContent: "center", alignItems: "center", marginRight: 14, marginTop: 1, flexShrink: 0,
                 }}>
                   <Text style={{ color: "#D4AF37", fontWeight: "800", fontSize: 13 }}>{i + 1}</Text>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 22, marginBottom: 2 }}>{passo.emoji}</Text>
-                  <Text style={{ color: "#CCC", fontSize: 13, lineHeight: 19 }}>{passo.testo}</Text>
-                </View>
+                <Text style={{ flex: 1, color: "#CCC", fontSize: 14, lineHeight: 21 }}>{testo}</Text>
               </View>
             ))}
           </View>
