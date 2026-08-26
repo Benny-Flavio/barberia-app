@@ -25,9 +25,9 @@ const PASSI: Record<Piattaforma, string[]> = {
   ],
   windows: [
     "Apri questo sito su Chrome o Microsoft Edge",
-    "Clicca sull'icona ⊕ nella barra degli indirizzi (in alto a destra)",
-    'Seleziona "Installa Bulldog Barber Shop"',
-    "Clicca Installa — troverai l'app nel menu Start e sul Desktop!",
+    "Chrome: clicca i tre puntini ⋮ in alto a destra → cerca \"Salva e condividi\" → \"Installa come app\"\nEdge: clicca i tre puntini ... → cerca \"App\" → \"Installa questo sito come app\"",
+    "Dai un nome all'app e clicca \"Installa\"",
+    "Troverai l'app sul Desktop e nel menu Start!",
   ],
   mac: [
     "Apri questo sito su Chrome o Safari",
