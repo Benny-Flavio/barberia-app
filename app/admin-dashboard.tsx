@@ -1534,13 +1534,13 @@ export default function AdminDashboard() {
       </ScrollView>
 
       {/* BOTTOM TAB BAR */}
-      <View style={[st.bottomBar, { marginHorizontal: -20 }]}>
-        <Pressable style={st.bottomTab} onPress={() => setActiveTab("home")}>
-          <Text style={{ fontSize: 22 }}>🏠</Text>
+      <View style={st.bottomBar}>
+        <Pressable style={[st.bottomTab, activeTab === "home" && st.bottomTabA]} onPress={() => setActiveTab("home")}>
+          <Text style={{ fontSize: 20 }}>🏠</Text>
           <Text style={[st.bottomTabLabel, activeTab === "home" && st.bottomTabLabelA]}>Home</Text>
         </Pressable>
-        <Pressable style={st.bottomTab} onPress={() => setActiveTab("agenda")}>
-          <Text style={{ fontSize: 22 }}>📅</Text>
+        <Pressable style={[st.bottomTab, activeTab === "agenda" && st.bottomTabA]} onPress={() => setActiveTab("agenda")}>
+          <Text style={{ fontSize: 20 }}>📅</Text>
           <Text style={[st.bottomTabLabel, activeTab === "agenda" && st.bottomTabLabelA]}>Agenda</Text>
         </Pressable>
       </View>

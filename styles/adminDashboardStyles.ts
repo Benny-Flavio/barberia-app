@@ -4,7 +4,7 @@ const { height: SH } = Dimensions.get("window");
 export const SHEET_H = SH * 0.82;
 
 export const st = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0A0A0A", padding: 20 },
+  container: { flex: 1, backgroundColor: "#0A0A0A", padding: 20, overflow: "hidden" as any },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -710,22 +710,32 @@ export const st = StyleSheet.create({
   // Bottom tab bar
   bottomBar: {
     flexDirection: "row",
-    backgroundColor: "#111",
-    borderTopWidth: 1,
-    borderTopColor: "#1A1A1A",
-    paddingBottom: 10,
-    paddingTop: 6,
+    backgroundColor: "#141414",
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "#252525",
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    marginBottom: 18,
+    shadowColor: "#000",
+    shadowOpacity: 0.45,
+    shadowRadius: 16,
+    elevation: 12,
   },
   bottomTab: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
+    paddingVertical: 9,
     gap: 3,
+    borderRadius: 16,
     cursor: "pointer" as any,
   },
+  bottomTabA: {
+    backgroundColor: "rgba(212,175,55,0.1)",
+  },
   bottomTabLabel: {
-    color: "#444",
+    color: "#555",
     fontSize: 11,
     fontWeight: "700",
     letterSpacing: 0.5,
