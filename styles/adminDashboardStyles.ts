@@ -1,15 +1,25 @@
 import { Dimensions, StyleSheet } from "react-native";
 
-const { height: SH } = Dimensions.get("window");
+const { height: SH, width: SW } = Dimensions.get("window");
 export const SHEET_H = SH * 0.82;
+const isDesktop = SW > 768;
+const CONTENT_MAX = 1100;
 
 export const st = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0A0A0A", padding: 20, overflow: "hidden" as any },
+  container: {
+    flex: 1,
+    backgroundColor: "#0A0A0A",
+    padding: isDesktop ? 32 : 20,
+    overflow: "hidden" as any,
+    maxWidth: isDesktop ? CONTENT_MAX : undefined,
+    alignSelf: isDesktop ? ("center" as any) : undefined,
+    width: "100%",
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginTop: 10,
+    marginTop: isDesktop ? 20 : 10,
     marginBottom: 16,
   },
   headerLabel: {
