@@ -1,17 +1,7 @@
-import { Dimensions, Platform, StyleSheet } from "react-native";
-
-const { width: SW } = Dimensions.get("window");
-const isDesktop = SW > 768;
+import { Platform, StyleSheet } from "react-native";
 
 export const st = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0A0A0A",
-    padding: isDesktop ? 48 : 24,
-    maxWidth: isDesktop ? 800 : undefined,
-    alignSelf: isDesktop ? ("center" as any) : undefined,
-    width: "100%",
-  },
+  container: { flex: 1, backgroundColor: "#0A0A0A", padding: 24 },
   header: { marginTop: 20, marginBottom: 30 },
   backBtn: { marginBottom: 20, cursor: "pointer" as any },
   backText: { color: "#D4AF37", fontSize: 14, fontWeight: "600" },

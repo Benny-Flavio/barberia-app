@@ -1,17 +1,12 @@
 // styles/homeStyles.ts
 import { Dimensions, Platform, StyleSheet } from "react-native";
 
-const { height: SH, width: SW } = Dimensions.get("window");
+const { height: SH } = Dimensions.get("window");
 export const SHEET_H = SH * 0.85;
-const isDesktop = SW > 768;
 
 export const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0A0A0A" },
-  scroll: {
-    paddingHorizontal: isDesktop ? 48 : 24,
-    paddingTop: 24,
-    paddingBottom: 40,
-  },
+  scroll: { padding: 24, paddingBottom: 40 },
 
   // Header
   header: {
@@ -28,18 +23,18 @@ export const s = StyleSheet.create({
     marginBottom: 12,
   },
   logo: {
-    width: isDesktop ? 60 : 48,
-    height: isDesktop ? 60 : 48,
-    borderRadius: isDesktop ? 20 : 16,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     borderWidth: 2,
     borderColor: "#D4AF37",
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
   },
-  logoImg: { width: isDesktop ? 62 : 50, height: isDesktop ? 62 : 50 },
+  logoImg: { width: 50, height: 50 },
   brandText: {
-    fontSize: isDesktop ? 13 : 11,
+    fontSize: 11,
     fontWeight: "800",
     color: "#D4AF37",
     letterSpacing: 4,
@@ -52,19 +47,19 @@ export const s = StyleSheet.create({
     lineHeight: 34,
   },
   profileBtn: {
-    width: isDesktop ? 52 : 44,
-    height: isDesktop ? 52 : 44,
-    borderRadius: isDesktop ? 16 : 14,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: "#D4AF37",
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer" as any,
   },
-  profileIcon: { fontSize: isDesktop ? 22 : 18 },
+  profileIcon: { fontSize: 18 },
 
   // Sections
   sectionTitle: {
-    fontSize: isDesktop ? 12 : 11,
+    fontSize: 11,
     fontWeight: "700",
     color: "#555",
     letterSpacing: 3,
@@ -100,13 +95,13 @@ export const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  mainTitle: { fontSize: isDesktop ? 18 : 17, fontWeight: "800", color: "#D4AF37" },
-  mainSub: { fontSize: isDesktop ? 13 : 12, color: "#666", marginTop: 2 },
+  mainTitle: { fontSize: 17, fontWeight: "800", color: "#D4AF37" },
+  mainSub: { fontSize: 12, color: "#666", marginTop: 2 },
   mainArrow: { fontSize: 24, color: "#D4AF37", fontWeight: "300" },
   mainBar: { height: 3, backgroundColor: "#D4AF37", opacity: 0.6 },
 
   // Grid
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: isDesktop ? 20 : 12 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   gridCard: {
     flexBasis: "45%" as any,
     flexGrow: 1,
@@ -115,8 +110,7 @@ export const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#1E1E1E",
     borderRadius: 18,
-    paddingVertical: 20,
-    paddingHorizontal: isDesktop ? 28 : 20,
+    padding: 20,
     ...(Platform.OS === "web" ? { cursor: "pointer" } : {}),
   },
   gridCardMsg: {
@@ -127,18 +121,17 @@ export const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#1E1E1E",
     borderRadius: 18,
-    paddingVertical: 20,
-    paddingHorizontal: isDesktop ? 28 : 20,
+    padding: 20,
     ...(Platform.OS === "web" ? { cursor: "pointer" } : {}),
   },
   gridCardPressed: {
     borderColor: "rgba(212,175,55,0.4)",
     transform: [{ scale: 0.97 }],
   },
-  gridIcon: { fontSize: isDesktop ? 28 : 24, marginBottom: 10 },
-  gridTitle: { fontSize: isDesktop ? 15 : 14, fontWeight: "700", color: "#FFF" },
-  gridTitleGold: { fontSize: isDesktop ? 15 : 14, fontWeight: "700", color: "#D4AF37" },
-  gridSub: { fontSize: isDesktop ? 12 : 11, color: "#555", marginTop: 4 },
+  gridIcon: { fontSize: 24, marginBottom: 10 },
+  gridTitle: { fontSize: 14, fontWeight: "700", color: "#FFF" },
+  gridTitleGold: { fontSize: 14, fontWeight: "700", color: "#D4AF37" },
+  gridSub: { fontSize: 11, color: "#555", marginTop: 4 },
   iconRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   badge: {
     backgroundColor: "#D4AF37",

@@ -2,8 +2,10 @@ import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import { router, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { View } from "react-native";
+import { Dimensions, View } from "react-native";
 import { supabase } from "../lib/supabase";
+
+const isDesktop = Dimensions.get("window").width > 768;
 
 export default function RootLayout() {
   useEffect(() => {
@@ -20,6 +22,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={DarkTheme}>
       <View style={{ flex: 1, backgroundColor: "#0A0A0A" }}>
+        <View style={{ flex: 1, maxWidth: isDesktop ? 1100 : undefined, width: "100%", alignSelf: isDesktop ? ("center" as any) : undefined }}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="home" />
@@ -33,6 +36,7 @@ export default function RootLayout() {
           <Stack.Screen name="admin-dashboard" />
         </Stack>
         <StatusBar style="light" />
+        </View>
       </View>
     </ThemeProvider>
   );
