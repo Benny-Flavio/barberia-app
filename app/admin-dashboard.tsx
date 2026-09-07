@@ -1534,15 +1534,17 @@ export default function AdminDashboard() {
       </ScrollView>
 
       {/* BOTTOM TAB BAR */}
-      <View style={st.bottomBar}>
-        <Pressable style={[st.bottomTab, activeTab === "home" && st.bottomTabA]} onPress={() => setActiveTab("home")}>
-          <Text style={{ fontSize: 20 }}>🏠</Text>
-          <Text style={[st.bottomTabLabel, activeTab === "home" && st.bottomTabLabelA]}>Home</Text>
-        </Pressable>
-        <Pressable style={[st.bottomTab, activeTab === "agenda" && st.bottomTabA]} onPress={() => setActiveTab("agenda")}>
-          <Text style={{ fontSize: 20 }}>📅</Text>
-          <Text style={[st.bottomTabLabel, activeTab === "agenda" && st.bottomTabLabelA]}>Agenda</Text>
-        </Pressable>
+      <View style={{ paddingBottom: "env(safe-area-inset-bottom)" as any }}>
+        <View style={st.bottomBar}>
+          <Pressable style={[st.bottomTab, activeTab === "home" && st.bottomTabA]} onPress={() => setActiveTab("home")}>
+            <Text style={{ fontSize: 20 }}>🏠</Text>
+            <Text style={[st.bottomTabLabel, activeTab === "home" && st.bottomTabLabelA]}>Home</Text>
+          </Pressable>
+          <Pressable style={[st.bottomTab, activeTab === "agenda" && st.bottomTabA]} onPress={() => setActiveTab("agenda")}>
+            <Text style={{ fontSize: 20 }}>📅</Text>
+            <Text style={[st.bottomTabLabel, activeTab === "agenda" && st.bottomTabLabelA]}>Agenda</Text>
+          </Pressable>
+        </View>
       </View>
 
       {/* MODAL AGGIUNGI — STEP 1: FORM */}
