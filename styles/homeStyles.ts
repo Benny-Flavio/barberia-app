@@ -4,16 +4,12 @@ import { Dimensions, Platform, StyleSheet } from "react-native";
 const { height: SH, width: SW } = Dimensions.get("window");
 export const SHEET_H = SH * 0.85;
 const isDesktop = SW > 768;
-const CONTENT_MAX = 960;
 
 export const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0A0A0A" },
   scroll: {
     padding: isDesktop ? 48 : 24,
     paddingBottom: 40,
-    maxWidth: isDesktop ? CONTENT_MAX : undefined,
-    alignSelf: isDesktop ? ("center" as any) : undefined,
-    width: "100%",
   },
 
   // Header
@@ -109,27 +105,27 @@ export const s = StyleSheet.create({
   mainBar: { height: 3, backgroundColor: "#D4AF37", opacity: 0.6 },
 
   // Grid
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: isDesktop ? 16 : 12 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: isDesktop ? 20 : 12 },
   gridCard: {
-    flexBasis: isDesktop ? ("22%" as any) : ("45%" as any),
+    flexBasis: "45%" as any,
     flexGrow: 1,
     flexShrink: 0,
     backgroundColor: "#141414",
     borderWidth: 1,
     borderColor: "#1E1E1E",
     borderRadius: 18,
-    padding: isDesktop ? 28 : 20,
+    padding: isDesktop ? 32 : 20,
     ...(Platform.OS === "web" ? { cursor: "pointer" } : {}),
   },
   gridCardMsg: {
-    flexBasis: isDesktop ? ("22%" as any) : ("45%" as any),
+    flexBasis: "45%" as any,
     flexGrow: 1,
     flexShrink: 0,
     backgroundColor: "#141414",
     borderWidth: 1,
     borderColor: "#1E1E1E",
     borderRadius: 18,
-    padding: isDesktop ? 28 : 20,
+    padding: isDesktop ? 32 : 20,
     ...(Platform.OS === "web" ? { cursor: "pointer" } : {}),
   },
   gridCardPressed: {
