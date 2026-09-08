@@ -95,7 +95,7 @@ export const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  mainTitle: { fontSize: 17, fontWeight: "800", color: "#D4AF37" },
+  mainTitle: { fontSize: 17, fontWeight: "800", color: "#D4AF37", textTransform: "uppercase", letterSpacing: 0.5 },
   mainSub: { fontSize: 12, color: "#666", marginTop: 2 },
   mainArrow: { fontSize: 24, color: "#D4AF37", fontWeight: "300" },
   mainBar: { height: 3, backgroundColor: "#D4AF37", opacity: 0.6 },
