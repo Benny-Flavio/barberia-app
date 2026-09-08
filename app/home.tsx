@@ -421,7 +421,7 @@ export default function Home() {
             onPress={() => router.push("/sedi-info" as any)}
           >
             <Text style={s.gridIcon}>📍</Text>
-            <Text style={s.gridTitle}>Sedi</Text>
+            <Text style={s.gridTitle}>Le Nostre Sedi</Text>
             <Text style={s.gridSub}>Info e barbieri</Text>
           </Pressable>
 

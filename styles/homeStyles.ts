@@ -129,8 +129,8 @@ export const s = StyleSheet.create({
     transform: [{ scale: 0.97 }],
   },
   gridIcon: { fontSize: 24, marginBottom: 10 },
-  gridTitle: { fontSize: 14, fontWeight: "700", color: "#FFF", textTransform: "uppercase", letterSpacing: 0.5 },
-  gridTitleGold: { fontSize: 14, fontWeight: "700", color: "#D4AF37", textTransform: "uppercase", letterSpacing: 0.5 },
+  gridTitle: { fontSize: 14, fontWeight: "700", color: "#FFF" },
+  gridTitleGold: { fontSize: 14, fontWeight: "700", color: "#D4AF37" },
   gridSub: { fontSize: 11, color: "#555", marginTop: 4 },
   iconRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   badge: {
