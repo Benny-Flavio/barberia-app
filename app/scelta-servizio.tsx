@@ -63,6 +63,14 @@ export default function SceltaServizio() {
       });
   }, []);
 
+  const isGettonato = (nome: string) => {
+    const n = nome.trim().toLowerCase();
+    return n === "taglio" || n === "rasatura";
+  };
+
+  const gettonati = servizi.filter((s) => isGettonato(s.nome));
+  const altri = servizi.filter((s) => !isGettonato(s.nome));
+
   const selezionaServizio = (servizio: any) => {
     router.push({
       pathname: "/scelta-data",
@@ -77,7 +85,7 @@ export default function SceltaServizio() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+      <ScrollView showsVerticalScrollIndicator={false} bounces={false} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
         <Animated.View
           style={[
             styles.header,
@@ -102,15 +110,41 @@ export default function SceltaServizio() {
             <Text style={styles.loadingText}>Caricamento servizi...</Text>
           </View>
         ) : (
-          <View style={styles.cardsContainer}>
-            {servizi.map((item, index) => (
-              <AnimatedCard
-                key={item.id}
-                item={item}
-                index={index}
-                onPress={selezionaServizio}
-              />
-            ))}
+          <View>
+            {gettonati.length > 0 && (
+              <>
+                <Text style={styles.sectionHeader}>— I Più Scelti</Text>
+                <View style={styles.featuredGrid}>
+                  {gettonati.map((item, index) => (
+                    <AnimatedCard
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      onPress={selezionaServizio}
+                      variant="grid"
+                    />
+                  ))}
+                </View>
+              </>
+            )}
+            {altri.length > 0 && (
+              <>
+                <Text style={[styles.sectionHeader, { marginTop: 28 }]}>
+                  — Altri Servizi
+                </Text>
+                <View style={styles.cardsContainer}>
+                  {altri.map((item, index) => (
+                    <AnimatedCard
+                      key={item.id}
+                      item={item}
+                      index={gettonati.length + index}
+                      onPress={selezionaServizio}
+                      variant="list"
+                    />
+                  ))}
+                </View>
+              </>
+            )}
           </View>
         )}
         <View style={{ height: 40 }} />
@@ -123,10 +157,12 @@ function AnimatedCard({
   item,
   index,
   onPress,
+  variant = "list",
 }: {
   item: any;
   index: number;
   onPress: (s: any) => void;
+  variant?: "list" | "grid";
 }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translate = useRef(new Animated.Value(30)).current;
@@ -151,6 +187,37 @@ function AnimatedCard({
       200 + index * 100,
     );
   }, []);
+
+  if (variant === "grid") {
+    return (
+      <Animated.View
+        style={[
+          styles.featuredCardWrapper,
+          { opacity, transform: [{ translateY: translate }] },
+        ]}
+      >
+        <Pressable
+          style={({ pressed }) => [
+            styles.featuredCard,
+            pressed && styles.featuredCardPressed,
+          ]}
+          onPress={() => onPress(item)}
+        >
+          <View style={styles.featuredIconContainer}>
+            <Text style={styles.featuredIcon}>{getIcona(item.nome)}</Text>
+          </View>
+          <Text style={styles.featuredName}>{item.nome}</Text>
+          <Text style={styles.featuredDuration}>⏳ {item.durata_minuti} min</Text>
+          <View style={styles.featuredPriceRow}>
+            <Text style={styles.featuredPriceSymbol}>€</Text>
+            <Text style={styles.featuredPrice}>
+              {Number(item.prezzo).toFixed(0)}
+            </Text>
+          </View>
+        </Pressable>
+      </Animated.View>
+    );
+  }
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateY: translate }] }}>

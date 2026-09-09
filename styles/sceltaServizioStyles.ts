@@ -1,7 +1,7 @@
 import { Platform, StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0A0A0A", padding: 24 },
+  container: { flex: 1, backgroundColor: "#0A0A0A" },
   header: { marginTop: 20, marginBottom: 30 },
   backButton: { marginBottom: 20, cursor: "pointer" as any },
   backButtonText: { color: "#D4AF37", fontSize: 14, fontWeight: "600" },
@@ -16,6 +16,70 @@ export const styles = StyleSheet.create({
   sedeChipText: { color: "#D4AF37", fontSize: 13, fontWeight: "600" },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingText: { color: "#555", marginTop: 15, fontSize: 14 },
+
+  // Section headers
+  sectionHeader: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#555",
+    letterSpacing: 3,
+    textTransform: "uppercase",
+    marginBottom: 14,
+    marginTop: 8,
+  },
+
+  // Featured grid (2 per row)
+  featuredGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 8,
+  },
+  featuredCardWrapper: {
+    flexBasis: "47%" as any,
+    flexGrow: 1,
+  },
+  featuredCard: {
+    backgroundColor: "#141414",
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#1E1E1E",
+    ...(Platform.OS === "web" ? { cursor: "pointer" } : {}),
+  },
+  featuredCardPressed: {
+    borderColor: "#D4AF37",
+    backgroundColor: "#1A1A0A",
+    transform: [{ scale: 0.97 }],
+  },
+  featuredIconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: "rgba(212, 175, 55, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  featuredIcon: { fontSize: 24 },
+  featuredName: {
+    color: "#FFF",
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  featuredDuration: { color: "#444", fontSize: 12, marginBottom: 10 },
+  featuredPriceRow: { flexDirection: "row", alignItems: "flex-start" },
+  featuredPriceSymbol: {
+    color: "#D4AF37",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 2,
+    marginRight: 1,
+  },
+  featuredPrice: { color: "#D4AF37", fontSize: 24, fontWeight: "800" },
+
+  // List cards (existing)
   cardsContainer: { gap: 12 },
   serviceCard: {
     backgroundColor: "#141414",

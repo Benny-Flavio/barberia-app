@@ -104,6 +104,7 @@ export default function MieiAppuntamenti() {
 
   return (
     <SafeAreaView style={st.container}>
+      <View style={{ flex: 1, padding: 24 }}>
       <Animated.View style={[st.header, { opacity: headerOp }]}>
         <Pressable onPress={() => router.back()} style={st.backBtn}>
           <Text style={st.backText}>← Indietro</Text>
@@ -144,6 +145,7 @@ export default function MieiAppuntamenti() {
             data={prenotazioni}
             keyExtractor={(i) => i.id.toString()}
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 40 }}
             renderItem={({ item }) => {
               const d = fmtData(item.data);
               return (
@@ -180,6 +182,7 @@ export default function MieiAppuntamenti() {
           />
         </>
       )}
+      </View>
     </SafeAreaView>
   );
 }

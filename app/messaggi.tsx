@@ -75,7 +75,7 @@ export default function Messaggi() {
 
   return (
     <SafeAreaView style={s.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
         <Animated.View style={[s.header, { opacity: headerOp }]}>
           <Pressable onPress={() => router.back()} style={s.backBtn}>
             <Text style={s.backText}>← Indietro</Text>

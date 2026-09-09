@@ -1,7 +1,7 @@
 import { StyleSheet } from "react-native";
 
 export const st = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0A0A0A", padding: 24 },
+  container: { flex: 1, backgroundColor: "#0A0A0A" },
   header: { marginTop: 20, marginBottom: 20 },
   backBtn: { marginBottom: 20, cursor: "pointer" as any },
   backText: { color: "#D4AF37", fontSize: 14, fontWeight: "600" },

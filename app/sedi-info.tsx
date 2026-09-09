@@ -67,7 +67,7 @@ export default function SediInfo() {
 
   return (
     <SafeAreaView style={st.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
         <Animated.View style={[st.header, { opacity: headerOp }]}>
           <Pressable onPress={() => router.back()} style={st.backBtn}>
             <Text style={st.backText}>← Indietro</Text>

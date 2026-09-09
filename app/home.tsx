@@ -316,55 +316,85 @@ export default function Home() {
         <Animated.View style={{ opacity: mainCardOp, transform: [{ translateY: mainCardY }] }}>
         {appDomani.length > 0 && (() => {
           const app = appDomani[reminderIdx];
+          const isOggi = new Date(app.data).toISOString().split("T")[0] === new Date().toISOString().split("T")[0];
+          const hasNext = reminderIdx < appDomani.length - 1;
+          const hasNextNext = reminderIdx < appDomani.length - 2;
           return (
-            <View style={s.reminderBanner}>
-              <Text style={s.reminderIcon}>🔔</Text>
-              <View style={s.reminderBody}>
-                <View style={s.reminderHeader}>
-                  <Text style={s.reminderTitle}>
-                    {(() => {
-                      const isOggi = new Date(app.data).toISOString().split("T")[0] === new Date().toISOString().split("T")[0];
-                      const giorno = isOggi ? "OGGI" : "DOMANI";
-                      return appDomani.length === 1 ? `APPUNTAMENTO ${giorno}` : `APPUNTAMENTI ${giorno}`;
-                    })()}
+            <View style={{ marginTop: 16, marginBottom: 4 }}>
+              {/* Front card */}
+              <View style={[s.reminderBanner, { zIndex: 10, marginBottom: 0 }]}>
+                <Text style={s.reminderIcon}>🔔</Text>
+                <View style={s.reminderBody}>
+                  <Text style={[s.reminderTitle, { marginBottom: 6 }]}>
+                    {`APPUNTAMENTO ${isOggi ? "OGGI" : "DOMANI"}`}
                   </Text>
+                  <Text style={s.reminderService}>{app.servizio_nome}</Text>
+                  <Text style={s.reminderDetail}>🕐 {app.ora?.slice(0, 5)}  💈 {app.barbiere_nome}</Text>
+                  <Text style={s.reminderDetail}>📍 {app.sede_nome}</Text>
                   {appDomani.length > 1 && (
-                    <Text style={s.reminderCounter}>{reminderIdx + 1}/{appDomani.length}</Text>
+                    <View style={{ flexDirection: 'row', gap: 5, marginTop: 10 }}>
+                      {appDomani.map((_, i) => (
+                        <Pressable
+                          key={i}
+                          onPress={() => setReminderIdx(i)}
+                          style={{
+                            width: i === reminderIdx ? 16 : 6,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: i === reminderIdx ? '#D4AF37' : 'rgba(212,175,55,0.3)',
+                            cursor: 'pointer' as any,
+                          }}
+                        />
+                      ))}
+                    </View>
                   )}
                 </View>
-                <Text style={s.reminderService}>{app.servizio_nome}</Text>
-                <Text style={s.reminderDetail}>🕐 {app.ora?.slice(0, 5)}  💈 {app.barbiere_nome}</Text>
-                <Text style={s.reminderDetail}>📍 {app.sede_nome}</Text>
-                {appDomani.length > 1 && (
-                  <View style={s.reminderNav}>
-                    <Pressable
-                      onPress={() => setReminderIdx(i => Math.max(0, i - 1))}
-                      disabled={reminderIdx === 0}
-                      style={[s.reminderNavBtn, reminderIdx === 0 && { opacity: 0.25 }]}
-                    >
-                      <Text style={s.reminderNavText}>‹ Prec</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setReminderIdx(i => Math.min(appDomani.length - 1, i + 1))}
-                      disabled={reminderIdx === appDomani.length - 1}
-                      style={[s.reminderNavBtn, reminderIdx === appDomani.length - 1 && { opacity: 0.25 }]}
-                    >
-                      <Text style={s.reminderNavText}>Succ ›</Text>
-                    </Pressable>
-                  </View>
-                )}
+                <Pressable
+                  style={s.reminderClose}
+                  onPress={async () => {
+                    await AsyncStorage.setItem(`reminder_dismissed_${app.id}`, "1");
+                    const nuovi = appDomani.filter((a: any) => a.id !== app.id);
+                    setAppDomani(nuovi);
+                    setReminderIdx(i => Math.min(i, Math.max(0, nuovi.length - 1)));
+                  }}
+                >
+                  <Text style={s.reminderCloseText}>✕</Text>
+                </Pressable>
               </View>
-              <Pressable
-                style={s.reminderClose}
-                onPress={async () => {
-                  await AsyncStorage.setItem(`reminder_dismissed_${app.id}`, "1");
-                  const nuovi = appDomani.filter((a: any) => a.id !== app.id);
-                  setAppDomani(nuovi);
-                  setReminderIdx(i => Math.min(i, Math.max(0, nuovi.length - 1)));
-                }}
-              >
-                <Text style={s.reminderCloseText}>✕</Text>
-              </Pressable>
+              {/* Second card peek — tappable → next */}
+              {hasNext && (
+                <Pressable
+                  onPress={() => setReminderIdx(i => i + 1)}
+                  style={{
+                    height: 14,
+                    marginHorizontal: 8,
+                    marginTop: -8,
+                    backgroundColor: '#1E1800',
+                    borderBottomLeftRadius: 14,
+                    borderBottomRightRadius: 14,
+                    borderWidth: 1,
+                    borderTopWidth: 0,
+                    borderColor: 'rgba(212,175,55,0.25)',
+                    zIndex: 9,
+                    cursor: 'pointer' as any,
+                  }}
+                />
+              )}
+              {/* Third card peek */}
+              {hasNextNext && (
+                <View style={{
+                  height: 12,
+                  marginHorizontal: 16,
+                  marginTop: -6,
+                  backgroundColor: '#1B1500',
+                  borderBottomLeftRadius: 12,
+                  borderBottomRightRadius: 12,
+                  borderWidth: 1,
+                  borderTopWidth: 0,
+                  borderColor: 'rgba(212,175,55,0.14)',
+                  zIndex: 8,
+                }} />
+              )}
             </View>
           );
         })()}
