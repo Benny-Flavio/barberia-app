@@ -1013,11 +1013,9 @@ export default function AdminDashboard() {
                   const isP = info.tipo === "permesso";
                   const durataStr = (() => {
                     if (isP) {
-                      const inizioD = new Date(info.inizio);
-                      const fineD = new Date(info.fine);
-                      const dataStr = fmtDataShort(inizioD.toISOString().split("T")[0]);
-                      const oraI = `${String(inizioD.getHours()).padStart(2,"0")}:${String(inizioD.getMinutes()).padStart(2,"0")}`;
-                      const oraF = `${String(fineD.getHours()).padStart(2,"0")}:${String(fineD.getMinutes()).padStart(2,"0")}`;
+                      const dataStr = fmtDataShort(info.inizio.slice(0, 10));
+                      const oraI = info.inizio.slice(11, 16);
+                      const oraF = info.fine.slice(11, 16);
                       return `il ${dataStr} dalle ${oraI} alle ${oraF}`;
                     }
                     const inizio = info.inizio;
@@ -1179,9 +1177,7 @@ export default function AdminDashboard() {
             ))}
             {barbieriProgrammati.map((b) => {
               const info = JSON.parse(b.motivo_assenza);
-              const dataInizio = info.tipo === "permesso"
-                ? new Date(info.inizio).toISOString().split("T")[0]
-                : info.inizio;
+              const dataInizio = info.inizio.slice(0, 10);
               return (
                 <View key={b.id} style={[st.absCard, { borderColor: "rgba(212,175,55,0.2)", backgroundColor: "rgba(212,175,55,0.03)" }]}>
                   <Text style={[st.absText, { color: "#888" }]}>🕓 {b.nome} — {info.tipo === "permesso" ? "permesso" : "assenza"} prog. il {fmtDataShort(dataInizio)}</Text>
@@ -1256,8 +1252,7 @@ export default function AdminDashboard() {
                         } else if (bData.motivo_assenza) {
                           try {
                             const info = JSON.parse(bData.motivo_assenza);
-                            const d = new Date(info.inizio);
-                            const localD = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                            const localD = info.inizio.slice(0, 10);
                             if (localD === dataCorrente) {
                               soloOverlayTipo = "permesso";
                               soloPermOv = calcPermOvS(bData.motivo_assenza);
@@ -1270,9 +1265,7 @@ export default function AdminDashboard() {
                           try {
                             const info = JSON.parse(bp.motivo_assenza);
                             if (info.tipo === "permesso") {
-                              const d = new Date(info.inizio);
-                              const ld = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-                              return ld === dataCorrente;
+                              return info.inizio.slice(0, 10) === dataCorrente;
                             }
                             if (info.tipo === "assente") {
                               return dataCorrente >= info.inizio && (!info.fine || dataCorrente <= info.fine);
@@ -1429,8 +1422,7 @@ export default function AdminDashboard() {
                           // Permesso attivo: mostra overlay solo nel giorno del permesso (data locale)
                           try {
                             const info = JSON.parse(b.motivo_assenza);
-                            const d = new Date(info.inizio);
-                            const localD = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                            const localD = info.inizio.slice(0, 10);
                             if (localD === dataCorrente) {
                               overlayTipo = "permesso";
                               permOv = calcPermOv(b.motivo_assenza);
@@ -1444,9 +1436,7 @@ export default function AdminDashboard() {
                           try {
                             const info = JSON.parse(bp.motivo_assenza);
                             if (info.tipo === "permesso") {
-                              const d = new Date(info.inizio);
-                              const ld = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-                              return ld === dataCorrente;
+                              return info.inizio.slice(0, 10) === dataCorrente;
                             }
                             if (info.tipo === "assente") {
                               return dataCorrente >= info.inizio && (!info.fine || dataCorrente <= info.fine);
