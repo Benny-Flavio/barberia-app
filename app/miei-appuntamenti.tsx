@@ -136,8 +136,10 @@ export default function MieiAppuntamenti() {
             <View style={st.confirmBanner}>
               <Text style={{ fontSize: 18 }}>✅</Text>
               <Text style={st.confirmText}>
-                Hai {prenotazioni.length} appuntament
-                {prenotazioni.length === 1 ? "o confermato" : "i confermati"}
+                {(() => {
+                  const n = prenotazioni.filter(p => p.stato === "attivo").length;
+                  return `Hai ${n} appuntament${n === 1 ? "o confermato" : "i confermati"}`;
+                })()}
               </Text>
             </View>
           )}
@@ -148,33 +150,40 @@ export default function MieiAppuntamenti() {
             contentContainerStyle={{ paddingBottom: 40 }}
             renderItem={({ item }) => {
               const d = fmtData(item.data);
+              const isCancellato = item.stato === "cancellato";
               return (
-                <View style={st.card}>
+                <View style={[st.card, isCancellato && { borderColor: "#2A0A0A", backgroundColor: "#0F0909" }]}>
                   <View style={st.cardRow}>
-                    <View style={st.dateBox}>
-                      <Text style={st.dateDay}>{d.giorno}</Text>
-                      <Text style={st.dateNum}>{d.numero}</Text>
-                      <Text style={st.dateMon}>{d.mese}</Text>
+                    <View style={[st.dateBox, isCancellato && { backgroundColor: "rgba(244,67,54,0.06)" }]}>
+                      <Text style={[st.dateDay, isCancellato && { color: "#555" }]}>{d.giorno}</Text>
+                      <Text style={[st.dateNum, isCancellato && { color: "#555", textDecorationLine: "line-through" }]}>{d.numero}</Text>
+                      <Text style={[st.dateMon, isCancellato && { color: "#444" }]}>{d.mese}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={st.cardServ}>{item.servizio_nome}</Text>
-                      <Text style={st.cardDet}>
+                      <Text style={[st.cardServ, isCancellato && { color: "#555", textDecorationLine: "line-through" }]}>{item.servizio_nome}</Text>
+                      <Text style={[st.cardDet, isCancellato && { color: "#444" }]}>
                         🕐 {item.ora?.slice(0, 5)} 💈 {item.barbiere_nome}
                       </Text>
-                      <Text style={st.sedeTag}>📍 {item.sede_nome}</Text>
+                      <Text style={[st.sedeTag, isCancellato && { color: "#444" }]}>📍 {item.sede_nome}</Text>
                     </View>
-                    <Text style={st.cardPrice}>€{item.servizio_prezzo}</Text>
+                    <Text style={[st.cardPrice, isCancellato && { color: "#444" }]}>€{item.servizio_prezzo}</Text>
                   </View>
                   <View style={st.cardFoot}>
-                    <View style={st.statoChip}>
-                      <Text style={st.statoText}>● Confermato</Text>
+                    <View style={[st.statoChip, isCancellato && { backgroundColor: "rgba(244,67,54,0.1)" }]}>
+                      <Text style={[st.statoText, isCancellato && { color: "#F44336" }]}>
+                        {isCancellato ? "● Cancellato" : "● Confermato"}
+                      </Text>
                     </View>
-                    <Pressable
-                      style={st.cancelBtn}
-                      onPress={() => cancella(item.id)}
-                    >
-                      <Text style={st.cancelText}>Cancella</Text>
-                    </Pressable>
+                    {isCancellato ? (
+                      <Text style={{ fontSize: 11, color: "#555", fontStyle: "italic" }}>Assenza barbiere</Text>
+                    ) : (
+                      <Pressable
+                        style={st.cancelBtn}
+                        onPress={() => cancella(item.id)}
+                      >
+                        <Text style={st.cancelText}>Cancella</Text>
+                      </Pressable>
+                    )}
                   </View>
                 </View>
               );

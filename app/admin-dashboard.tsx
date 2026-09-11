@@ -1464,38 +1464,44 @@ export default function AdminDashboard() {
                             <View key={ora} style={{ position: "absolute", top: idx * SLOT_H, left: 0, right: 0, height: 1, backgroundColor: "#1A1A1A" }} />
                           ))}
                           {/* Card appuntamenti */}
-                          {appsBarb.map((app: any) => {
+                          {prenotazioni.filter((p: any) => p.barbiere_id === b.id).map((app: any) => {
                             const startStr = (app.ora || "").slice(0, 5);
                             const startIdx = orariGiornata.indexOf(startStr);
                             if (startIdx === -1) return null;
                             const numSlots = Math.max(1, Math.ceil((app.durata_minuti || 20) / 20));
                             const cardTop = startIdx * SLOT_H + 3;
                             const cardH = numSlots * SLOT_H - 6;
+                            const isCancellato = app.stato === "cancellato";
                             return (
                               <Pressable
                                 key={app.id}
-                                onPress={() => setAppDetail(app)}
+                                onPress={() => !isCancellato && setAppDetail(app)}
                                 style={{
                                   position: "absolute",
                                   top: cardTop,
                                   left: 3,
                                   right: 3,
                                   height: cardH,
-                                  backgroundColor: "#1C1C1C",
+                                  backgroundColor: isCancellato ? "#180808" : "#1C1C1C",
                                   borderRadius: 8,
                                   borderLeftWidth: 3,
-                                  borderLeftColor: color,
+                                  borderLeftColor: isCancellato ? "#4A0000" : color,
                                   padding: 6,
                                   justifyContent: "center",
                                   overflow: "hidden",
+                                  opacity: isCancellato ? 0.7 : 1,
                                 }}
                               >
-                                <Text style={{ color: "#FFF", fontSize: FONT_NOME, fontWeight: "700" }} numberOfLines={1}>{app.cliente_nome}</Text>
-                                <Text style={{ color: "#888", fontSize: FONT_SERV }} numberOfLines={1}>{app.servizio_nome}</Text>
-                                <Text style={{ color: "#555", fontSize: FONT_DUR }}>{app.durata_minuti || 20} min</Text>
-                                <Pressable onPress={() => cancella(app.id)} style={{ position: "absolute", top: 4, right: 4 }}>
-                                  <Text style={{ color: "#555", fontSize: 12 }}>✕</Text>
-                                </Pressable>
+                                <Text style={{ color: isCancellato ? "#555" : "#FFF", fontSize: FONT_NOME, fontWeight: "700", textDecorationLine: isCancellato ? "line-through" : "none" }} numberOfLines={1}>{app.cliente_nome}</Text>
+                                <Text style={{ color: "#555", fontSize: FONT_SERV }} numberOfLines={1}>{isCancellato ? "CANCELLATO" : app.servizio_nome}</Text>
+                                {!isCancellato && (
+                                  <>
+                                    <Text style={{ color: "#555", fontSize: FONT_DUR }}>{app.durata_minuti || 20} min</Text>
+                                    <Pressable onPress={() => cancella(app.id)} style={{ position: "absolute", top: 4, right: 4 }}>
+                                      <Text style={{ color: "#555", fontSize: 12 }}>✕</Text>
+                                    </Pressable>
+                                  </>
+                                )}
                               </Pressable>
                             );
                           })}
