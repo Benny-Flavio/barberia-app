@@ -6,6 +6,7 @@ import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Easing,
   Image,
   Pressable,
   ScrollView,
@@ -35,7 +36,12 @@ export default function Home() {
   const [numAppuntamenti, setNumAppuntamenti] = useState(0);
   const [appDomani, setAppDomani] = useState<any[]>([]);
   const [reminderIdx, setReminderIdx] = useState(0);
+  const [transitioning, setTransitioning] = useState(false);
+  const [cardHeight, setCardHeight] = useState(130);
 
+  const nextCardY = useRef(new Animated.Value(0)).current;
+  const cancelFadeAnim = useRef(new Animated.Value(1)).current;
+  const pendingIdx = useRef(0);
   const sheetAnim = useRef(new Animated.Value(SHEET_H)).current;
   const overlayOp = useRef(new Animated.Value(0)).current;
   const headerOp = useRef(new Animated.Value(0)).current;
@@ -126,7 +132,7 @@ export default function Home() {
       });
       const data = await res.json();
       if (!Array.isArray(data)) return;
-      setNumAppuntamenti(data.length);
+      setNumAppuntamenti(data.filter((a: any) => a.stato === 'attivo').length);
 
       const adesso = new Date();
       const oggiStr = adesso.toISOString().split("T")[0];
@@ -146,8 +152,20 @@ export default function Home() {
       });
       const nonDismissi: any[] = [];
       for (const a of trovati) {
-        const dismissed = await AsyncStorage.getItem(`reminder_dismissed_${a.id}`);
-        if (!dismissed) nonDismissi.push(a);
+        if (a.stato === 'cancellato') {
+          // Mostra sempre i cancellati (ignorano il dismissed), marca per rilevare il ripristino
+          await AsyncStorage.setItem(`reminder_was_cancelled_${a.id}`, "1");
+          nonDismissi.push(a);
+        } else {
+          // Se era cancellato e ora è ripristinato, cancella il dismissed precedente
+          const wasCancelled = await AsyncStorage.getItem(`reminder_was_cancelled_${a.id}`);
+          if (wasCancelled) {
+            await AsyncStorage.removeItem(`reminder_dismissed_${a.id}`);
+            await AsyncStorage.removeItem(`reminder_was_cancelled_${a.id}`);
+          }
+          const dismissed = await AsyncStorage.getItem(`reminder_dismissed_${a.id}`);
+          if (!dismissed) nonDismissi.push(a);
+        }
       }
       setAppDomani(nonDismissi);
       setReminderIdx(0);
@@ -175,6 +193,28 @@ export default function Home() {
     return () => timers.forEach(clearTimeout);
   }, [appDomani]);
 
+  // Auto-dismiss popup cancellati dopo 15s con fade-out
+  useEffect(() => {
+    if (appDomani.length === 0) return;
+    const currentApp = appDomani[reminderIdx];
+    if (!currentApp || currentApp.stato !== 'cancellato') {
+      cancelFadeAnim.setValue(1);
+      return;
+    }
+    cancelFadeAnim.setValue(1);
+    const timer = setTimeout(() => {
+      Animated.timing(cancelFadeAnim, { toValue: 0, duration: 800, useNativeDriver: true }).start(() => {
+        cancelFadeAnim.setValue(1);
+        setAppDomani((prev) => {
+          const nuovi = prev.filter((x: any) => x.id !== currentApp.id);
+          setReminderIdx((i) => Math.min(i, Math.max(0, nuovi.length - 1)));
+          return nuovi;
+        });
+      });
+    }, 14200);
+    return () => clearTimeout(timer);
+  }, [appDomani, reminderIdx]);
+
   useFocusEffect(
     useCallback(() => {
       const ricarica = async () => {
@@ -187,6 +227,24 @@ export default function Home() {
       ricarica();
     }, []),
   );
+
+  const navigateTo = (newIdx: number) => {
+    if (transitioning || newIdx < 0 || newIdx >= appDomani.length) return;
+    const goingForward = newIdx > reminderIdx;
+    pendingIdx.current = newIdx;
+    setTransitioning(true);
+    // Avanti: entra dal basso (+cardHeight), Indietro: entra dall'alto (-cardHeight)
+    nextCardY.setValue(goingForward ? cardHeight : -cardHeight);
+    Animated.timing(nextCardY, {
+      toValue: 0,
+      duration: 300,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setReminderIdx(pendingIdx.current);
+      setTransitioning(false);
+    });
+  };
 
   const apriSheet = () => {
     setSheetVisible(true);
@@ -316,55 +374,101 @@ export default function Home() {
         <Animated.View style={{ opacity: mainCardOp, transform: [{ translateY: mainCardY }] }}>
         {appDomani.length > 0 && (() => {
           const app = appDomani[reminderIdx];
+          const risingApp = transitioning ? appDomani[pendingIdx.current] : null;
           const isOggi = new Date(app.data).toISOString().split("T")[0] === new Date().toISOString().split("T")[0];
+          const isCancellato = app.stato === 'cancellato';
+          const risingIsOggi = risingApp
+            ? new Date(risingApp.data).toISOString().split("T")[0] === new Date().toISOString().split("T")[0]
+            : false;
+          const risingIsCancellato = risingApp ? risingApp.stato === 'cancellato' : false;
+          const hasPrev = reminderIdx > 0;
           const hasNext = reminderIdx < appDomani.length - 1;
-          const hasNextNext = reminderIdx < appDomani.length - 2;
+
           return (
             <View style={{ marginTop: 16, marginBottom: 4 }}>
-              {/* Front card */}
-              <View style={[s.reminderBanner, { zIndex: 10, marginBottom: 0 }]}>
-                <Text style={s.reminderIcon}>🔔</Text>
-                <View style={s.reminderBody}>
-                  <Text style={[s.reminderTitle, { marginBottom: 6 }]}>
-                    {`APPUNTAMENTO ${isOggi ? "OGGI" : "DOMANI"}`}
-                  </Text>
-                  <Text style={s.reminderService}>{app.servizio_nome}</Text>
-                  <Text style={s.reminderDetail}>🕐 {app.ora?.slice(0, 5)}  💈 {app.barbiere_nome}</Text>
-                  <Text style={s.reminderDetail}>📍 {app.sede_nome}</Text>
-                  {appDomani.length > 1 && (
-                    <View style={{ flexDirection: 'row', gap: 5, marginTop: 10 }}>
-                      {appDomani.map((_, i) => (
-                        <Pressable
-                          key={i}
-                          onPress={() => setReminderIdx(i)}
-                          style={{
-                            width: i === reminderIdx ? 16 : 6,
-                            height: 6,
-                            borderRadius: 3,
-                            backgroundColor: i === reminderIdx ? '#D4AF37' : 'rgba(212,175,55,0.3)',
-                            cursor: 'pointer' as any,
-                          }}
-                        />
-                      ))}
-                    </View>
-                  )}
-                </View>
-                <Pressable
-                  style={s.reminderClose}
-                  onPress={async () => {
-                    await AsyncStorage.setItem(`reminder_dismissed_${app.id}`, "1");
-                    const nuovi = appDomani.filter((a: any) => a.id !== app.id);
-                    setAppDomani(nuovi);
-                    setReminderIdx(i => Math.min(i, Math.max(0, nuovi.length - 1)));
-                  }}
+              {/* zIndex: 10 sul container → sempre sopra i peek strip a zIndex 9 */}
+              <View style={{ zIndex: 10 }}>
+                {/* Front card */}
+                <Animated.View
+                  style={[s.reminderBanner, { marginBottom: 0 }, isCancellato && { backgroundColor: '#1A0505', borderColor: 'rgba(244,67,54,0.35)' }, { opacity: isCancellato ? cancelFadeAnim : 1 }]}
+                  onLayout={e => setCardHeight(e.nativeEvent.layout.height)}
                 >
-                  <Text style={s.reminderCloseText}>✕</Text>
-                </Pressable>
+                  <Text style={s.reminderIcon}>{isCancellato ? '❌' : '🔔'}</Text>
+                  <View style={s.reminderBody}>
+                    <Text style={[s.reminderTitle, { marginBottom: 6 }, isCancellato && { color: '#F44336' }]}>
+                      {isCancellato ? 'APPUNTAMENTO CANCELLATO' : `APPUNTAMENTO ${isOggi ? "OGGI" : "DOMANI"}`}
+                    </Text>
+                    <Text style={[s.reminderService, isCancellato && { color: '#555', textDecorationLine: 'line-through' }]}>{app.servizio_nome}</Text>
+                    <Text style={[s.reminderDetail, isCancellato && { color: '#444', textDecorationLine: 'line-through' }]}>🕐 {app.ora?.slice(0, 5)}  💈 {app.barbiere_nome}</Text>
+                    <Text style={[s.reminderDetail, isCancellato && { color: '#444' }]}>📍 {app.sede_nome}</Text>
+                    {isCancellato && <Text style={{ color: '#666', fontSize: 11, marginTop: 4, fontStyle: 'italic' }}>Assenza barbiere — si chiude automaticamente</Text>}
+                    {!isCancellato && appDomani.length > 1 && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 10 }}>
+                        <Pressable
+                          onPress={() => navigateTo(reminderIdx - 1)}
+                          style={{ opacity: hasPrev && !transitioning ? 1 : 0.25, paddingVertical: 2, paddingRight: 6, cursor: 'pointer' as any }}
+                        >
+                          <Text style={{ color: '#D4AF37', fontSize: 22, fontWeight: '300', lineHeight: 22 }}>‹</Text>
+                        </Pressable>
+                        <Text style={{ color: '#555', fontSize: 11 }}>{reminderIdx + 1} / {appDomani.length}</Text>
+                        <Pressable
+                          onPress={() => navigateTo(reminderIdx + 1)}
+                          style={{ opacity: hasNext && !transitioning ? 1 : 0.25, paddingVertical: 2, paddingLeft: 6, cursor: 'pointer' as any }}
+                        >
+                          <Text style={{ color: '#D4AF37', fontSize: 22, fontWeight: '300', lineHeight: 22 }}>›</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
+                  {!isCancellato && (
+                    <Pressable
+                      style={s.reminderClose}
+                      onPress={async () => {
+                        if (transitioning) return;
+                        await AsyncStorage.setItem(`reminder_dismissed_${app.id}`, "1");
+                        const nuovi = appDomani.filter((a: any) => a.id !== app.id);
+                        setAppDomani(nuovi);
+                        setReminderIdx(i => Math.min(i, Math.max(0, nuovi.length - 1)));
+                      }}
+                    >
+                      <Text style={s.reminderCloseText}>✕</Text>
+                    </Pressable>
+                  )}
+                </Animated.View>
+
+                {/* Card in arrivo — entra dal basso (avanti) o dall'alto (indietro) */}
+                {transitioning && risingApp && (
+                  <Animated.View
+                    style={[
+                      s.reminderBanner,
+                      risingIsCancellato && { backgroundColor: '#1A0505', borderColor: 'rgba(244,67,54,0.35)' },
+                      {
+                        position: 'absolute' as any,
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        zIndex: 1,
+                        transform: [{ translateY: nextCardY }],
+                      },
+                    ]}
+                  >
+                    <Text style={s.reminderIcon}>{risingIsCancellato ? '❌' : '🔔'}</Text>
+                    <View style={s.reminderBody}>
+                      <Text style={[s.reminderTitle, { marginBottom: 6 }, risingIsCancellato && { color: '#F44336' }]}>
+                        {risingIsCancellato ? 'APPUNTAMENTO CANCELLATO' : `APPUNTAMENTO ${risingIsOggi ? "OGGI" : "DOMANI"}`}
+                      </Text>
+                      <Text style={[s.reminderService, risingIsCancellato && { color: '#555', textDecorationLine: 'line-through' }]}>{risingApp.servizio_nome}</Text>
+                      <Text style={[s.reminderDetail, risingIsCancellato && { color: '#444', textDecorationLine: 'line-through' }]}>🕐 {risingApp.ora?.slice(0, 5)}  💈 {risingApp.barbiere_nome}</Text>
+                      <Text style={[s.reminderDetail, risingIsCancellato && { color: '#444' }]}>📍 {risingApp.sede_nome}</Text>
+                    </View>
+                    <View style={s.reminderClose} />
+                  </Animated.View>
+                )}
               </View>
-              {/* Second card peek — tappable → next */}
-              {hasNext && (
-                <Pressable
-                  onPress={() => setReminderIdx(i => i + 1)}
+
+              {/* Peek strips decorativi — mostrano che ci sono più card */}
+              {appDomani.length > 1 && (
+                <View
                   style={{
                     height: 14,
                     marginHorizontal: 8,
@@ -376,24 +480,24 @@ export default function Home() {
                     borderTopWidth: 0,
                     borderColor: 'rgba(212,175,55,0.25)',
                     zIndex: 9,
-                    cursor: 'pointer' as any,
                   }}
                 />
               )}
-              {/* Third card peek */}
-              {hasNextNext && (
-                <View style={{
-                  height: 12,
-                  marginHorizontal: 16,
-                  marginTop: -6,
-                  backgroundColor: '#1B1500',
-                  borderBottomLeftRadius: 12,
-                  borderBottomRightRadius: 12,
-                  borderWidth: 1,
-                  borderTopWidth: 0,
-                  borderColor: 'rgba(212,175,55,0.14)',
-                  zIndex: 8,
-                }} />
+              {appDomani.length > 2 && (
+                <View
+                  style={{
+                    height: 12,
+                    marginHorizontal: 16,
+                    marginTop: -6,
+                    backgroundColor: '#1B1500',
+                    borderBottomLeftRadius: 12,
+                    borderBottomRightRadius: 12,
+                    borderWidth: 1,
+                    borderTopWidth: 0,
+                    borderColor: 'rgba(212,175,55,0.14)',
+                    zIndex: 8,
+                  }}
+                />
               )}
             </View>
           );
