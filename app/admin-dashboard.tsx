@@ -1290,6 +1290,18 @@ export default function AdminDashboard() {
                           {orariGiornata.map((ora, idx) => (
                             <View key={ora} style={{ position: "absolute", top: idx * SLOT_H, left: 0, right: 0, height: 1, backgroundColor: "#1A1A1A" }} />
                           ))}
+                          {/* Overlay assente — intera colonna (sotto le card) */}
+                          {soloOverlayTipo === "assente" && (
+                            <View style={{ position: "absolute", top: 0, left: 0, right: 0, height: totalH, backgroundColor: "rgba(15,0,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
+                              <Text style={{ color: "#F44336", fontSize: 11, fontWeight: "800", letterSpacing: 1 }}>ASSENTE</Text>
+                            </View>
+                          )}
+                          {/* Overlay permesso — fascia oraria (sotto le card) */}
+                          {soloOverlayTipo === "permesso" && soloPermOv && (
+                            <View style={{ position: "absolute", top: soloPermOv.top, left: 0, right: 0, height: soloPermOv.height, backgroundColor: "rgba(30,15,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
+                              <Text style={{ color: "#E5734A", fontSize: 10, fontWeight: "800", letterSpacing: 1 }}>PERMESSO</Text>
+                            </View>
+                          )}
                           {appsBarb.map((app: any) => {
                             const startStr = (app.ora || "").slice(0, 5);
                             const startIdx = orariGiornata.indexOf(startStr);
@@ -1301,7 +1313,7 @@ export default function AdminDashboard() {
                               <Pressable
                                 key={app.id}
                                 onPress={() => setAppDetail(app)}
-                                style={{ position: "absolute", top: cardTop, left: 3, right: 3, height: cardH, backgroundColor: "#1C1C1C", borderRadius: 8, borderLeftWidth: 3, borderLeftColor: color, padding: 8, justifyContent: "center", overflow: "hidden" }}
+                                style={{ position: "absolute", top: cardTop, left: 3, right: 3, height: cardH, backgroundColor: "#1C1C1C", borderRadius: 8, borderLeftWidth: 3, borderLeftColor: color, padding: 8, justifyContent: "center", overflow: "hidden", zIndex: 2 }}
                               >
                                 <Text style={{ color: "#FFF", fontSize: FONT_NOME, fontWeight: "700" }} numberOfLines={1}>{app.cliente_nome}</Text>
                                 <Text style={{ color: "#888", fontSize: FONT_SERV }} numberOfLines={1}>{app.servizio_nome}</Text>
@@ -1317,18 +1329,6 @@ export default function AdminDashboard() {
                               </Pressable>
                             );
                           })}
-                          {/* Overlay assente — intera colonna */}
-                          {soloOverlayTipo === "assente" && (
-                            <View style={{ position: "absolute", top: 0, left: 0, right: 0, height: totalH, backgroundColor: "rgba(15,0,0,0.72)", alignItems: "center", justifyContent: "center" }}>
-                              <Text style={{ color: "#F44336", fontSize: 11, fontWeight: "800", letterSpacing: 1 }}>ASSENTE</Text>
-                            </View>
-                          )}
-                          {/* Overlay permesso — fascia oraria */}
-                          {soloOverlayTipo === "permesso" && soloPermOv && (
-                            <View style={{ position: "absolute", top: soloPermOv.top, left: 0, right: 0, height: soloPermOv.height, backgroundColor: "rgba(30,15,0,0.72)", alignItems: "center", justifyContent: "center" }}>
-                              <Text style={{ color: "#E5734A", fontSize: 10, fontWeight: "800", letterSpacing: 1 }}>PERMESSO</Text>
-                            </View>
-                          )}
                         </View>
                       );
                     })()}
@@ -1463,7 +1463,19 @@ export default function AdminDashboard() {
                           {orariGiornata.map((ora, idx) => (
                             <View key={ora} style={{ position: "absolute", top: idx * SLOT_H, left: 0, right: 0, height: 1, backgroundColor: "#1A1A1A" }} />
                           ))}
-                          {/* Card appuntamenti */}
+                          {/* Overlay assente — intera colonna (sotto le card) */}
+                          {overlayTipo === "assente" && (
+                            <View style={{ position: "absolute", top: 0, left: 0, right: 0, height: totalH, backgroundColor: "rgba(15,0,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
+                              <Text style={{ color: "#F44336", fontSize: 11, fontWeight: "800", letterSpacing: 1 }}>ASSENTE</Text>
+                            </View>
+                          )}
+                          {/* Overlay permesso — fascia oraria (sotto le card) */}
+                          {overlayTipo === "permesso" && permOv && (
+                            <View style={{ position: "absolute", top: permOv.top, left: 0, right: 0, height: permOv.height, backgroundColor: "rgba(30,15,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
+                              <Text style={{ color: "#E5734A", fontSize: 10, fontWeight: "800", letterSpacing: 1 }}>PERMESSO</Text>
+                            </View>
+                          )}
+                          {/* Card appuntamenti (sopra l'overlay) */}
                           {prenotazioni.filter((p: any) => p.barbiere_id === b.id).map((app: any) => {
                             const startStr = (app.ora || "").slice(0, 5);
                             const startIdx = orariGiornata.indexOf(startStr);
@@ -1490,6 +1502,7 @@ export default function AdminDashboard() {
                                   justifyContent: "center",
                                   overflow: "hidden",
                                   opacity: isCancellato ? 0.7 : 1,
+                                  zIndex: 2,
                                 }}
                               >
                                 <Text style={{ color: isCancellato ? "#555" : "#FFF", fontSize: FONT_NOME, fontWeight: "700", textDecorationLine: isCancellato ? "line-through" : "none" }} numberOfLines={1}>{app.cliente_nome}</Text>
@@ -1505,18 +1518,6 @@ export default function AdminDashboard() {
                               </Pressable>
                             );
                           })}
-                          {/* Overlay assente — intera colonna */}
-                          {overlayTipo === "assente" && (
-                            <View style={{ position: "absolute", top: 0, left: 0, right: 0, height: totalH, backgroundColor: "rgba(15,0,0,0.72)", alignItems: "center", justifyContent: "center" }}>
-                              <Text style={{ color: "#F44336", fontSize: 11, fontWeight: "800", letterSpacing: 1 }}>ASSENTE</Text>
-                            </View>
-                          )}
-                          {/* Overlay permesso — fascia oraria */}
-                          {overlayTipo === "permesso" && permOv && (
-                            <View style={{ position: "absolute", top: permOv.top, left: 0, right: 0, height: permOv.height, backgroundColor: "rgba(30,15,0,0.72)", alignItems: "center", justifyContent: "center" }}>
-                              <Text style={{ color: "#E5734A", fontSize: 10, fontWeight: "800", letterSpacing: 1 }}>PERMESSO</Text>
-                            </View>
-                          )}
                         </View>
                       );
                     })}
