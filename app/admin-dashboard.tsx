@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -63,12 +62,6 @@ LocaleConfig.locales["it"] = {
 LocaleConfig.defaultLocale = "it";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
-
-// La PWA usa la status bar "black-translucent": la pagina parte sotto orario/notch.
-// SafeAreaView di React Native sul web non fa nulla, quindi l'inset superiore va aggiunto via CSS.
-const SAFE_TOP_WEB = Platform.OS === "web"
-  ? { paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)" as any }
-  : null;
 
 const MESI_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const GIORNI_IT = ["Lu","Ma","Me","Gi","Ve","Sa","Do"];
@@ -918,7 +911,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <SafeAreaView style={[st.container, SAFE_TOP_WEB]}>
+    <SafeAreaView style={st.container}>
       {/* HEADER */}
       <Animated.View style={[st.header, { opacity: headerOp }]}>
         <View>
