@@ -4,7 +4,14 @@ const { height: SH } = Dimensions.get("window");
 export const SHEET_H = SH * 0.82;
 
 export const st = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0A0A0A", padding: 20, overflow: "hidden" as any },
+  // Padding in longhand: su web SafeAreaView imposta paddingTop/Right/Bottom/Left = safe-area
+  // insets, e in react-native-web i longhand vincono sullo shorthand `padding` (che veniva ignorato).
+  container: {
+    flex: 1, backgroundColor: "#0A0A0A", overflow: "hidden" as any,
+    paddingTop: 20, paddingRight: 20, paddingBottom: 20, paddingLeft: 20,
+  },
+  // Barra di navigazione: esce dal padding laterale del container per stare a tutta larghezza
+  bottomBarWrap: { marginLeft: -20, marginRight: -20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -708,15 +715,18 @@ export const st = StyleSheet.create({
   },
 
   // Bottom tab bar
+  // A tutta larghezza e appoggiata al bordo inferiore; l'area della home bar
+  // (safe-area-inset-bottom) è aggiunta come paddingBottom dentro la barra.
   bottomBar: {
     flexDirection: "row",
     backgroundColor: "#141414",
-    borderRadius: 22,
-    borderWidth: 1,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderTopWidth: 1,
     borderColor: "#252525",
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    marginBottom: 18,
+    paddingTop: 6,
+    paddingBottom: 6,
+    paddingHorizontal: 20,
     shadowColor: "#000",
     shadowOpacity: 0.45,
     shadowRadius: 16,
