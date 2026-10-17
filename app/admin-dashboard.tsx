@@ -354,6 +354,8 @@ export default function AdminDashboard() {
   const sheetAnim = useRef(new Animated.Value(SHEET_H)).current;
   const overlayOp = useRef(new Animated.Value(0)).current;
   const headerOp = useRef(new Animated.Value(0)).current;
+  // Barbiere (ruolo admin): vede e gestisce solo la propria agenda. Il backend applica comunque il limite.
+  const agendaPersonale = utente?.agenda_personale === true;
   const auth = (t?: string) => ({
     Authorization: `Bearer ${t || token}`,
     "Content-Type": "application/json",
@@ -402,8 +404,10 @@ export default function AdminDashboard() {
       setToken(session.access_token);
       setUtente(u);
       setEditNome(u.nome || "");
-      const resSedi = await fetch(`${BACKEND_URL}/api/sedi`);
-      const tutteSedi = await resSedi.json();
+      // Barbiere: solo le sedi in cui lavora (restituite da /api/auth/me)
+      const tutteSedi = u.agenda_personale && Array.isArray(meData.sedi)
+        ? meData.sedi
+        : await (await fetch(`${BACKEND_URL}/api/sedi`)).json();
       setSedi(tutteSedi);
       if (tutteSedi.length > 0) setSedeCorrente(tutteSedi[0].id);
       setFiltroBarbiere(u.barbiere_id || null);
@@ -427,13 +431,8 @@ export default function AdminDashboard() {
         `${BACKEND_URL}/api/barbieri-disponibili?sede_id=${sedeCorrente}&data=${dataCorrente}`,
       );
       const data = await res.json();
-      if (Array.isArray(data)) {
-        setBarbieri(data);
-      } else if (data.barbieri) {
-        setBarbieri(data.barbieri);
-      } else {
-        setBarbieri([]);
-      }
+      const lista = Array.isArray(data) ? data : data.barbieri || [];
+      setBarbieri(agendaPersonale ? lista.filter((b: any) => b.id === utente?.barbiere_id) : lista);
       const resAll = await fetchAuth(
         `${BACKEND_URL}/api/admin/barbieri?sede_id=${sedeCorrente}`,
       );
@@ -907,7 +906,7 @@ export default function AdminDashboard() {
       {/* HEADER */}
       <Animated.View style={[st.header, { opacity: headerOp }]}>
         <View>
-          <Text style={st.headerLabel}>AMMINISTRATORE</Text>
+          <Text style={st.headerLabel}>{agendaPersonale ? "LA MIA AGENDA" : "AMMINISTRATORE"}</Text>
           <Text style={st.headerBrand}>BULLDOG BARBER SHOP</Text>
           <Text style={st.headerUser}>💈 {utente?.nome}</Text>
         </View>
@@ -1134,7 +1133,8 @@ export default function AdminDashboard() {
               </Pressable>
             )}
 
-            {/* Filtro barbiere */}
+            {/* Filtro barbiere (solo titolare: il barbiere vede solo la propria agenda) */}
+            {!agendaPersonale && (<>
             <Pressable style={st.dataBtn} onPress={() => setShowFiltri(!showFiltri)}>
               <Text style={st.dataBtnText}>
                 💈{" "}
@@ -1160,6 +1160,7 @@ export default function AdminDashboard() {
                 ))}
               </View>
             )}
+            </>)}
 
             <View style={[st.actRow, { marginTop: 12 }]}>
               <Pressable style={st.actGold} onPress={apriModalAggiungi}>
