@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -62,6 +63,12 @@ LocaleConfig.locales["it"] = {
 LocaleConfig.defaultLocale = "it";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
+
+// La PWA usa la status bar "black-translucent": la pagina parte sotto orario/notch.
+// SafeAreaView di React Native sul web non fa nulla, quindi l'inset superiore va aggiunto via CSS.
+const SAFE_TOP_WEB = Platform.OS === "web"
+  ? { paddingTop: "calc(env(safe-area-inset-top, 0px) + 20px)" as any }
+  : null;
 
 const MESI_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const GIORNI_IT = ["Lu","Ma","Me","Gi","Ve","Sa","Do"];
@@ -911,7 +918,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <SafeAreaView style={st.container}>
+    <SafeAreaView style={[st.container, SAFE_TOP_WEB]}>
       {/* HEADER */}
       <Animated.View style={[st.header, { opacity: headerOp }]}>
         <View>
@@ -1554,18 +1561,18 @@ export default function AdminDashboard() {
         <View style={st.bottomBar}>
           <Pressable style={[st.bottomTab, activeTab === "home" && st.bottomTabA]} onPress={() => vaiATab("home")}>
             <Text style={{ fontSize: 20 }}>🏠</Text>
-            <Text style={[st.bottomTabLabel, activeTab === "home" && st.bottomTabLabelA]}>Home</Text>
+            <Text numberOfLines={1} style={[st.bottomTabLabel, activeTab === "home" && st.bottomTabLabelA]}>Home</Text>
           </Pressable>
           {/* "La mia agenda" solo per chi è collegato a un barbiere */}
           {utente?.barbiere_id != null && (
             <Pressable style={[st.bottomTab, activeTab === "mia" && st.bottomTabA]} onPress={() => vaiATab("mia")}>
               <Text style={{ fontSize: 20 }}>📋</Text>
-              <Text style={[st.bottomTabLabel, activeTab === "mia" && st.bottomTabLabelA]}>La mia agenda</Text>
+              <Text numberOfLines={1} style={[st.bottomTabLabel, activeTab === "mia" && st.bottomTabLabelA]}>La mia agenda</Text>
             </Pressable>
           )}
           <Pressable style={[st.bottomTab, activeTab === "globale" && st.bottomTabA]} onPress={() => vaiATab("globale")}>
             <Text style={{ fontSize: 20 }}>📅</Text>
-            <Text style={[st.bottomTabLabel, activeTab === "globale" && st.bottomTabLabelA]}>Agenda globale</Text>
+            <Text numberOfLines={1} style={[st.bottomTabLabel, activeTab === "globale" && st.bottomTabLabelA]}>Agenda globale</Text>
           </Pressable>
         </View>
       </View>

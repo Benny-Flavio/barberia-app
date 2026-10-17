@@ -738,7 +738,7 @@ export const st = StyleSheet.create({
     color: "#555",
     fontSize: 11,
     fontWeight: "700",
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
   bottomTabLabelA: { color: "#D4AF37" },
 
