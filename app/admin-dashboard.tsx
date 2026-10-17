@@ -347,15 +347,25 @@ export default function AdminDashboard() {
   const [showCambiaPw, setShowCambiaPw] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [nonLetteAdmin, setNonLetteAdmin] = useState(0);
-  const [activeTab, setActiveTab] = useState<"home" | "agenda">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "mia" | "globale">("home");
   const [appDetail, setAppDetail] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<any>(null);
   const sheetAnim = useRef(new Animated.Value(SHEET_H)).current;
   const overlayOp = useRef(new Animated.Value(0)).current;
   const headerOp = useRef(new Animated.Value(0)).current;
-  // Barbiere (ruolo admin): vede e gestisce solo la propria agenda. Il backend applica comunque il limite.
-  const agendaPersonale = utente?.agenda_personale === true;
+  // Staff di fiducia: tutti gestiscono gli appuntamenti di tutti. Assenze/permessi invece:
+  // un admin solo i propri, il titolare (super_admin) quelli di tutti (stessa regola del backend).
+  const puoGestireAssenze = (barbId: number) =>
+    utente?.ruolo === "super_admin" || (utente?.barbiere_id != null && barbId === utente.barbiere_id);
+  const barbieriGestibili = barbieri.filter((b) => !b.assente && puoGestireAssenze(b.id));
+  // "La mia agenda" = filtro sul barbiere loggato; "Agenda globale" = tutti i barbieri
+  const filtroPerTab = (tab: typeof activeTab) => (tab === "mia" ? utente?.barbiere_id ?? null : null);
+  const vaiATab = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    setShowFiltri(false);
+    setFiltroBarbiere(filtroPerTab(tab));
+  };
   const auth = (t?: string) => ({
     Authorization: `Bearer ${t || token}`,
     "Content-Type": "application/json",
@@ -404,13 +414,11 @@ export default function AdminDashboard() {
       setToken(session.access_token);
       setUtente(u);
       setEditNome(u.nome || "");
-      // Barbiere: solo le sedi in cui lavora (restituite da /api/auth/me)
-      const tutteSedi = u.agenda_personale && Array.isArray(meData.sedi)
-        ? meData.sedi
-        : await (await fetch(`${BACKEND_URL}/api/sedi`)).json();
+      const resSedi = await fetch(`${BACKEND_URL}/api/sedi`);
+      const tutteSedi = await resSedi.json();
       setSedi(tutteSedi);
       if (tutteSedi.length > 0) setSedeCorrente(tutteSedi[0].id);
-      setFiltroBarbiere(u.barbiere_id || null);
+      setFiltroBarbiere(null);
       const resServ = await fetch(`${BACKEND_URL}/api/servizi`);
       setServizi(await resServ.json());
       setLoading(false);
@@ -432,7 +440,7 @@ export default function AdminDashboard() {
       );
       const data = await res.json();
       const lista = Array.isArray(data) ? data : data.barbieri || [];
-      setBarbieri(agendaPersonale ? lista.filter((b: any) => b.id === utente?.barbiere_id) : lista);
+      setBarbieri(lista);
       const resAll = await fetchAuth(
         `${BACKEND_URL}/api/admin/barbieri?sede_id=${sedeCorrente}`,
       );
@@ -484,7 +492,8 @@ export default function AdminDashboard() {
     setLoadingOrari(false);
   };
   const apriModalAggiungi = () => {
-    const p = barbieri.find((b) => !b.assente);
+    // Preseleziona il barbiere filtrato (es. se stesso in "La mia agenda"), ma si può scegliere chiunque
+    const p = barbieri.find((b) => !b.assente && b.id === filtroBarbiere) || barbieri.find((b) => !b.assente);
     const ps = servizi[0];
     setNewBarbiere(p?.id || 0);
     setNewServizio(ps?.id || 0);
@@ -906,7 +915,7 @@ export default function AdminDashboard() {
       {/* HEADER */}
       <Animated.View style={[st.header, { opacity: headerOp }]}>
         <View>
-          <Text style={st.headerLabel}>{agendaPersonale ? "LA MIA AGENDA" : "AMMINISTRATORE"}</Text>
+          <Text style={st.headerLabel}>STAFF</Text>
           <Text style={st.headerBrand}>BULLDOG BARBER SHOP</Text>
           <Text style={st.headerUser}>💈 {utente?.nome}</Text>
         </View>
@@ -931,7 +940,7 @@ export default function AdminDashboard() {
           <Pressable
             key={sede.id}
             style={[st.sedeTab, sedeCorrente === sede.id && st.sedeTabA]}
-            onPress={() => { setSedeCorrente(sede.id); setFiltroBarbiere(utente?.barbiere_id); setShowFiltri(false); }}
+            onPress={() => { setSedeCorrente(sede.id); setFiltroBarbiere(filtroPerTab(activeTab)); setShowFiltri(false); }}
           >
             <Text style={[st.sedeTabText, sedeCorrente === sede.id && st.sedeTabTextA]}>
               {sede.nome}
@@ -974,10 +983,11 @@ export default function AdminDashboard() {
               </Pressable>
             )}
 
-            {/* Pulsanti Assente / Permesso */}
+            {/* Pulsanti Assente / Permesso (solo per i barbieri di cui l'utente gestisce le assenze) */}
+            {barbieriGestibili.length > 0 && (
             <View style={[st.actRow, { marginTop: 16 }]}>
               <Pressable style={st.actRed} onPress={() => {
-                setAssenzaBarbiere(barbieri.find((b) => !b.assente)?.id || 0);
+                setAssenzaBarbiere(barbieriGestibili[0].id);
                 setAssenzaData(todayStr);
                 setAssenzaGiorni(1);
                 setShowAssenza(true);
@@ -985,7 +995,7 @@ export default function AdminDashboard() {
                 <Text style={st.actRedText}>🔴 Assente</Text>
               </Pressable>
               <Pressable style={st.actOrange} onPress={() => {
-                setAssenzaBarbiere(barbieri.find((b) => !b.assente)?.id || 0);
+                setAssenzaBarbiere(barbieriGestibili[0].id);
                 const now = new Date();
                 setPermessoOraInizio(`${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`);
                 setPermessoData(todayStr);
@@ -995,6 +1005,7 @@ export default function AdminDashboard() {
                 <Text style={st.actOrangeText}>🕐 Permesso</Text>
               </Pressable>
             </View>
+            )}
 
             {/* Card per barbiere — solo su giorni aperti, solo i barbieri di turno quel giorno */}
             {(barbieriAssenti.length > 0 || barbieriProgrammati.length > 0) && (
@@ -1002,9 +1013,11 @@ export default function AdminDashboard() {
                 {barbieriAssenti.map((b) => (
                   <View key={b.id} style={[st.absCard, { marginBottom: 0 }]}>
                     <Text style={st.absText}>{isPermessoBarbiere(b) ? "🟡" : "🔴"} {b.nome} {isPermessoBarbiere(b) ? "è in permesso" : "è assente"}</Text>
+                    {puoGestireAssenze(b.id) && (
                     <Pressable style={st.absBtn} onPress={() => riattiva(b.id)}>
                       <Text style={st.absBtnText}>Riattiva</Text>
                     </Pressable>
+                    )}
                   </View>
                 ))}
                 {barbieriProgrammati.map((b) => {
@@ -1030,9 +1043,11 @@ export default function AdminDashboard() {
                         <Text style={[st.absText, { color: "#888" }]}>🕓 {b.nome} — {isP ? "permesso programmato" : "assenza programmata"}</Text>
                         <Text style={{ color: "#666", fontSize: 11, marginTop: 2 }}>{durataStr}</Text>
                       </View>
+                      {puoGestireAssenze(b.id) && (
                       <Pressable style={st.absBtn} onPress={() => riattiva(b.id)}>
                         <Text style={st.absBtnText}>Annulla</Text>
                       </Pressable>
+                      )}
                     </View>
                   );
                 })}
@@ -1096,9 +1111,12 @@ export default function AdminDashboard() {
           </>
         )}
 
-        {/* ══════════ AGENDA TAB ══════════ */}
-        {activeTab === "agenda" && (
+        {/* ══════════ AGENDA: "La mia agenda" (filtrata sul barbiere loggato) / "Agenda globale" ══════════ */}
+        {(activeTab === "mia" || activeTab === "globale") && (
           <>
+            <Text style={{ color: "#D4AF37", fontSize: 12, fontWeight: "700", letterSpacing: 1.5, textAlign: "center", marginTop: 14 }}>
+              {activeTab === "mia" ? `📋 LA MIA AGENDA — ${utente?.nome || ""}` : "👥 AGENDA GLOBALE"}
+            </Text>
             {/* Navigazione settimana */}
             <View style={st.weekHeader}>
               <Pressable style={st.weekArrow} onPress={() => shiftWeek(-1)}>
@@ -1133,27 +1151,23 @@ export default function AdminDashboard() {
               </Pressable>
             )}
 
-            {/* Filtro barbiere (solo titolare: il barbiere vede solo la propria agenda) */}
-            {!agendaPersonale && (<>
+            {/* Filtro barbiere (solo Agenda globale: "La mia agenda" è già filtrata sul barbiere loggato) */}
+            {activeTab === "globale" && (<>
             <Pressable style={st.dataBtn} onPress={() => setShowFiltri(!showFiltri)}>
               <Text style={st.dataBtnText}>
                 💈{" "}
-                {filtroBarbiere === utente?.barbiere_id ? "I Miei Appuntamenti"
-                  : filtroBarbiere === null ? "Tutti i Barbieri"
+                {filtroBarbiere === null ? "Tutti i Barbieri"
                   : barbieri.find((b) => b.id === filtroBarbiere)?.nome || "Barbiere"}
               </Text>
               <Text style={{ color: "#D4AF37", fontSize: 14 }}>{showFiltri ? "▲" : "▼"}</Text>
             </Pressable>
             {showFiltri && (
               <View style={st.filtriDrop}>
-                <Pressable style={[st.filtroItem, filtroBarbiere === utente?.barbiere_id && st.filtroItemA]} onPress={() => { setFiltroBarbiere(utente?.barbiere_id); setShowFiltri(false); }}>
-                  <Text style={[st.filtroItemText, filtroBarbiere === utente?.barbiere_id && st.filtroItemTextA]}>📋 I Miei Appuntamenti</Text>
-                </Pressable>
-                <View style={{ height: 1, backgroundColor: "#1A1A1A", marginVertical: 4 }} />
                 <Pressable style={[st.filtroItem, filtroBarbiere === null && st.filtroItemA]} onPress={() => { setFiltroBarbiere(null); setShowFiltri(false); }}>
                   <Text style={[st.filtroItemText, filtroBarbiere === null && st.filtroItemTextA]}>👥 Tutti i Barbieri</Text>
                 </Pressable>
-                {barbieri.filter((b) => !b.assente && b.id !== utente?.barbiere_id).map((b) => (
+                <View style={{ height: 1, backgroundColor: "#1A1A1A", marginVertical: 4 }} />
+                {barbieri.filter((b) => !b.assente).map((b) => (
                   <Pressable key={b.id} style={[st.filtroItem, filtroBarbiere === b.id && st.filtroItemA]} onPress={() => { setFiltroBarbiere(b.id); setShowFiltri(false); }}>
                     <Text style={[st.filtroItemText, filtroBarbiere === b.id && st.filtroItemTextA]}>💈 {b.nome}</Text>
                   </Pressable>
@@ -1171,9 +1185,11 @@ export default function AdminDashboard() {
             {barbieriAssenti.map((b) => (
               <View key={b.id} style={st.absCard}>
                 <Text style={st.absText}>{isPermessoBarbiere(b) ? "🟡" : "🔴"} {b.nome} {isPermessoBarbiere(b) ? "è in permesso" : "è assente"}</Text>
+                {puoGestireAssenze(b.id) && (
                 <Pressable style={st.absBtn} onPress={() => riattiva(b.id)}>
                   <Text style={st.absBtnText}>Riattiva</Text>
                 </Pressable>
+                )}
               </View>
             ))}
             {barbieriProgrammati.map((b) => {
@@ -1182,9 +1198,11 @@ export default function AdminDashboard() {
               return (
                 <View key={b.id} style={[st.absCard, { borderColor: "rgba(212,175,55,0.2)", backgroundColor: "rgba(212,175,55,0.03)" }]}>
                   <Text style={[st.absText, { color: "#888" }]}>🕓 {b.nome} — {info.tipo === "permesso" ? "permesso" : "assenza"} prog. il {fmtDataShort(dataInizio)}</Text>
+                  {puoGestireAssenze(b.id) && (
                   <Pressable style={st.absBtn} onPress={() => riattiva(b.id)}>
                     <Text style={st.absBtnText}>Annulla</Text>
                   </Pressable>
+                  )}
                 </View>
               );
             })}
@@ -1534,13 +1552,20 @@ export default function AdminDashboard() {
       {/* BOTTOM TAB BAR */}
       <View style={{ paddingBottom: "env(safe-area-inset-bottom)" as any }}>
         <View style={st.bottomBar}>
-          <Pressable style={[st.bottomTab, activeTab === "home" && st.bottomTabA]} onPress={() => setActiveTab("home")}>
+          <Pressable style={[st.bottomTab, activeTab === "home" && st.bottomTabA]} onPress={() => vaiATab("home")}>
             <Text style={{ fontSize: 20 }}>🏠</Text>
             <Text style={[st.bottomTabLabel, activeTab === "home" && st.bottomTabLabelA]}>Home</Text>
           </Pressable>
-          <Pressable style={[st.bottomTab, activeTab === "agenda" && st.bottomTabA]} onPress={() => setActiveTab("agenda")}>
+          {/* "La mia agenda" solo per chi è collegato a un barbiere */}
+          {utente?.barbiere_id != null && (
+            <Pressable style={[st.bottomTab, activeTab === "mia" && st.bottomTabA]} onPress={() => vaiATab("mia")}>
+              <Text style={{ fontSize: 20 }}>📋</Text>
+              <Text style={[st.bottomTabLabel, activeTab === "mia" && st.bottomTabLabelA]}>La mia agenda</Text>
+            </Pressable>
+          )}
+          <Pressable style={[st.bottomTab, activeTab === "globale" && st.bottomTabA]} onPress={() => vaiATab("globale")}>
             <Text style={{ fontSize: 20 }}>📅</Text>
-            <Text style={[st.bottomTabLabel, activeTab === "agenda" && st.bottomTabLabelA]}>Agenda</Text>
+            <Text style={[st.bottomTabLabel, activeTab === "globale" && st.bottomTabLabelA]}>Agenda globale</Text>
           </Pressable>
         </View>
       </View>
@@ -1590,11 +1615,11 @@ export default function AdminDashboard() {
 
               {/* Barbiere */}
               <Text style={st.mLabel}>BARBIERE</Text>
-              <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
                 {barbieri.filter((b) => !b.assente).map((b) => (
                   <Pressable
                     key={b.id}
-                    style={[st.mChip, { flex: 1, alignItems: "center" }, newBarbiere === b.id && st.mChipA]}
+                    style={[st.mChip, { flexGrow: 1, flexBasis: "30%", alignItems: "center" }, newBarbiere === b.id && st.mChipA]}
                     onPress={() => { setNewBarbiere(b.id); caricaOrariNuovo(b.id, newServizio); }}
                   >
                     <Text style={[st.mChipText, newBarbiere === b.id && st.mChipTextA]}>{b.nome}</Text>
@@ -1747,11 +1772,11 @@ export default function AdminDashboard() {
               <Text style={st.mLabel}>DATA FINE</Text>
               <CalendarioInline value={assenzaFine} onChange={setAssenzaFine} min={assenzaData || todayStr} marginBottom={16} />
 
-              {barbieri.filter((b) => !b.assente).length > 1 && (
+              {barbieriGestibili.length > 1 && (
                 <>
                   <Text style={st.mLabel}>BARBIERE</Text>
                   <View style={[st.mGrid, { marginBottom: 16 }]}>
-                    {barbieri.filter((b) => !b.assente).map((b) => (
+                    {barbieriGestibili.map((b) => (
                       <Pressable key={b.id} style={[st.mChip, { flex: 1, alignItems: "center" }, assenzaBarbiere === b.id && st.mChipA]} onPress={() => setAssenzaBarbiere(b.id)}>
                         <Text style={[st.mChipText, assenzaBarbiere === b.id && st.mChipTextA]}>{b.nome}</Text>
                       </Pressable>
@@ -1882,11 +1907,11 @@ export default function AdminDashboard() {
                 </Pressable>
               </View>
 
-              {barbieri.length > 1 && (
+              {barbieriGestibili.length > 1 && (
                 <>
                   <Text style={st.mLabel}>BARBIERE</Text>
                   <View style={[st.mGrid, { marginBottom: 16 }]}>
-                    {barbieri.map((b) => (
+                    {barbieriGestibili.map((b) => (
                       <Pressable key={b.id} style={[st.mChip, { flex: 1, alignItems: "center" }, assenzaBarbiere === b.id && st.mChipA]} onPress={() => setAssenzaBarbiere(b.id)}>
                         <Text style={[st.mChipText, assenzaBarbiere === b.id && st.mChipTextA]}>{b.nome}</Text>
                       </Pressable>
