@@ -9,11 +9,13 @@ export default function Root({ children }: PropsWithChildren) {
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, shrink-to-fit=no, viewport-fit=cover"
         />
         <ScrollViewStyleReset />
         <style>{`
           html, body, #root { height: 100%; background-color: #0A0A0A; }
+          /* Sotto i 16px Safari/Chrome mobile fanno zoom automatico al focus sui campi */
+          input, select, textarea { font-size: 16px !important; }
         `}</style>
       </head>
       <body>{children}</body>

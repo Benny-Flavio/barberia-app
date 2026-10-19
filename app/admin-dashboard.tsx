@@ -492,7 +492,8 @@ export default function AdminDashboard() {
   };
   const apriModalAggiungi = () => {
     // Preseleziona il barbiere filtrato (es. se stesso in "La mia agenda"), ma si può scegliere chiunque
-    const p = barbieri.find((b) => !b.assente && b.id === filtroBarbiere) || barbieri.find((b) => !b.assente);
+    // Esclusi i barbieri assenti tutto il giorno (disabilitato); i permessi bloccano solo gli orari
+    const p = barbieri.find((b) => !b.disabilitato && b.id === filtroBarbiere) || barbieri.find((b) => !b.disabilitato);
     const ps = servizi[0];
     setNewBarbiere(p?.id || 0);
     setNewServizio(ps?.id || 0);
@@ -1613,7 +1614,7 @@ export default function AdminDashboard() {
               {/* Barbiere */}
               <Text style={st.mLabel}>BARBIERE</Text>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-                {barbieri.filter((b) => !b.assente).map((b) => (
+                {barbieri.filter((b) => !b.disabilitato).map((b) => (
                   <Pressable
                     key={b.id}
                     style={[st.mChip, { flexGrow: 1, flexBasis: "30%", alignItems: "center" }, newBarbiere === b.id && st.mChipA]}

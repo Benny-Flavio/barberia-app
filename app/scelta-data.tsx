@@ -324,7 +324,8 @@ export default function SceltaData() {
                 style={styles.horizontalScroll}
               >
                 {barbieri.map((b) => {
-                  const isDisab = b.disabilitato || b.assente;
+                  // disabilitato = assente tutto il giorno; un permesso blocca solo i suoi orari
+                  const isDisab = b.disabilitato;
                   const isSelected = barbiereSelezionato?.id === b.id && !isDisab;
                   return (
                     <Pressable

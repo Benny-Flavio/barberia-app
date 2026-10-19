@@ -554,7 +554,7 @@ export const st = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     color: "#FFF",
-    fontSize: 15,
+    fontSize: 16, // < 16px fa scattare lo zoom automatico su mobile
     outlineStyle: "none",
   } as any,
   mInputFocus: {
@@ -695,7 +695,7 @@ export const st = StyleSheet.create({
     borderRadius: 12,
     padding: 13,
     color: "#FFF",
-    fontSize: 15,
+    fontSize: 16, // < 16px fa scattare lo zoom automatico su mobile
   },
   sBtnRow: { flexDirection: "row", gap: 10, marginTop: 14 },
   sBtnCancel: {
