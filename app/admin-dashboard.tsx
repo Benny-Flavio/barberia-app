@@ -62,6 +62,43 @@ LocaleConfig.defaultLocale = "it";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
 
+// ── Rotazione tra sedi ──
+// I barbieri arrivano da /api/admin/barbieri?sede_id=X con giorni_lavoro = giorni della
+// settimana (0=Dom … 6=Sab) in cui lavorano IN QUELLA SEDE.
+const giornoSettimana = (dataStr: string) => {
+  const [y, m, d] = dataStr.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d).getDay();
+};
+const lavoraInSede = (b: any, dataStr: string) =>
+  Array.isArray(b.giorni_lavoro) && b.giorni_lavoro.includes(giornoSettimana(dataStr));
+
+// Giorni della settimana coperti da un'assenza/permesso (null = tutti: assenza senza fine o formato non leggibile)
+const giorniAssenza = (b: any): number[] | null => {
+  try {
+    const info = JSON.parse(b.motivo_assenza || "");
+    if (info.tipo === "permesso") return [giornoSettimana(info.inizio)];
+    if (!info.inizio || !info.fine) return null;
+    const giorni = new Set<number>();
+    const [y, m, d] = info.inizio.split("-").map(Number);
+    const giorno = new Date(y, m - 1, d);
+    for (let i = 0; i < 7; i++) {
+      const ds = `${giorno.getFullYear()}-${String(giorno.getMonth() + 1).padStart(2, "0")}-${String(giorno.getDate()).padStart(2, "0")}`;
+      if (ds > info.fine) break;
+      giorni.add(giorno.getDay());
+      giorno.setDate(giorno.getDate() + 1);
+    }
+    return [...giorni];
+  } catch {
+    return null;
+  }
+};
+// L'assenza/permesso riguarda questa sede? Solo se cade in un giorno in cui il barbiere lavora qui.
+const assenzaInSede = (b: any) => {
+  const lavoro: number[] = Array.isArray(b.giorni_lavoro) ? b.giorni_lavoro : [];
+  const giorni = giorniAssenza(b);
+  return giorni === null ? lavoro.length > 0 : giorni.some((g) => lavoro.includes(g));
+};
+
 const MESI_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const GIORNI_IT = ["Lu","Ma","Me","Gi","Ve","Sa","Do"];
 
@@ -446,9 +483,10 @@ export default function AdminDashboard() {
       const allBarb = await resAll.json();
       if (Array.isArray(allBarb)) {
         setTuttiBarbieri(allBarb);
-        setBarbieriAssenti(allBarb.filter((b: any) => b.assente));
+        // Banner assenze/permessi solo nella sede in cui il barbiere avrebbe lavorato in quei giorni
+        setBarbieriAssenti(allBarb.filter((b: any) => b.assente && assenzaInSede(b)));
         setBarbieriProgrammati(allBarb.filter((b: any) => {
-          if (b.assente || !b.motivo_assenza?.startsWith("{")) return false;
+          if (b.assente || !b.motivo_assenza?.startsWith("{") || !assenzaInSede(b)) return false;
           try { return JSON.parse(b.motivo_assenza).stato === "programmato"; }
           catch { return false; }
         }));
@@ -849,12 +887,10 @@ export default function AdminDashboard() {
     );
   const attivi = prenotazioni.filter((p) => p.stato === "attivo");
 
-  // Griglia: barbieri disponibili + assenti (con overlay), presi da tuttiBarbieri che ha assente/motivo_assenza
+  // Griglia: SOLO i barbieri in turno in questa sede nella data selezionata (gli assenti
+  // restano con l'overlay). Un barbiere in rotazione che quel giorno è nell'altra sede non ha colonna.
   const barbieriGriglia = tuttiBarbieri.length > 0
-    ? tuttiBarbieri.filter((b: any) =>
-        barbieri.some((bb: any) => bb.id === b.id) ||
-        barbieriAssenti.some((ba: any) => ba.id === b.id)
-      )
+    ? tuttiBarbieri.filter((b: any) => lavoraInSede(b, dataCorrente))
     : barbieri;
   const barbieriTabella = filtroBarbiere
     ? barbieriGriglia.filter((b: any) => b.id === filtroBarbiere)
@@ -1210,6 +1246,15 @@ export default function AdminDashboard() {
               <View style={st.emptyBox}>
                 <Text style={{ fontSize: 40, marginBottom: 12 }}>🔒</Text>
                 <Text style={st.emptyText}>Giorno di chiusura</Text>
+              </View>
+            ) : prenotazioniPerBarbiere.length === 0 ? (
+              <View style={st.emptyBox}>
+                <Text style={{ fontSize: 40, marginBottom: 12 }}>🔁</Text>
+                <Text style={st.emptyText}>
+                  {activeTab === "mia"
+                    ? `Non sei in turno a ${sedi.find((s) => s.id === sedeCorrente)?.nome || "questa sede"} in questa data`
+                    : "Nessun barbiere in turno in questa sede"}
+                </Text>
               </View>
             ) : prenotazioniPerBarbiere.length === 1 ? (() => {
               const screenW = Dimensions.get("window").width;
