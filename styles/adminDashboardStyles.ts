@@ -2,15 +2,16 @@ import { Dimensions, StyleSheet } from "react-native";
 
 const { height: SH } = Dimensions.get("window");
 export const SHEET_H = SH * 0.82;
-// Altezza fissa della bottom bar (contenuto + 20px per la home bar dell'iPhone)
-export const BOTTOM_BAR_H = 84;
+// Bottom bar flottante: altezza fissa e distanza dal fondo dello schermo
+export const BOTTOM_BAR_H = 68;
+export const BOTTOM_BAR_OFFSET = 20;
 
 export const st = StyleSheet.create({
-  // Valori fissi (niente safe-area dinamica): paddingTop 50 per scendere sotto il notch,
-  // paddingBottom = altezza della bottom bar, così l'area scrollabile finisce prima della barra.
+  // Valori fissi (niente safe-area dinamica). In alto resta solo il marginTop dell'header;
+  // in basso lo spazio occupato dalla barra flottante (+8px), così l'area scrollabile finisce prima.
   container: {
     flex: 1, width: "100%", backgroundColor: "#0A0A0A", overflow: "hidden" as any,
-    paddingTop: 50, paddingBottom: BOTTOM_BAR_H,
+    paddingTop: 0, paddingBottom: BOTTOM_BAR_H + BOTTOM_BAR_OFFSET + 8,
   },
   header: {
     flexDirection: "row",
@@ -715,22 +716,21 @@ export const st = StyleSheet.create({
   },
 
   // Bottom tab bar
-  // Fissa sul fondo, altezza fissa; paddingBottom 20 per la home bar dell'iPhone
+  // Flottante "a isola": staccata dal fondo, 92% di larghezza centrata, angoli tutti arrotondati
   bottomBar: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: "100%",
+    left: "4%",
+    right: "4%",
+    bottom: BOTTOM_BAR_OFFSET,
     height: BOTTOM_BAR_H,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#141414",
-    borderTopWidth: 1,
+    borderRadius: 25,
+    borderWidth: 1,
     borderColor: "#252525",
-    paddingTop: 6,
-    paddingBottom: 20,
-    paddingHorizontal: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
     shadowColor: "#000",
     shadowOpacity: 0.45,
     shadowRadius: 16,
