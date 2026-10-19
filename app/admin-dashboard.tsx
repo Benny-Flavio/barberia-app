@@ -72,32 +72,38 @@ const giornoSettimana = (dataStr: string) => {
 const lavoraInSede = (b: any, dataStr: string) =>
   Array.isArray(b.giorni_lavoro) && b.giorni_lavoro.includes(giornoSettimana(dataStr));
 
-// Giorni della settimana coperti da un'assenza/permesso (null = tutti: assenza senza fine o formato non leggibile)
-const giorniAssenza = (b: any): number[] | null => {
-  try {
-    const info = JSON.parse(b.motivo_assenza || "");
-    if (info.tipo === "permesso") return [giornoSettimana(info.inizio)];
-    if (!info.inizio || !info.fine) return null;
-    const giorni = new Set<number>();
-    const [y, m, d] = info.inizio.split("-").map(Number);
-    const giorno = new Date(y, m - 1, d);
-    for (let i = 0; i < 7; i++) {
-      const ds = `${giorno.getFullYear()}-${String(giorno.getMonth() + 1).padStart(2, "0")}-${String(giorno.getDate()).padStart(2, "0")}`;
-      if (ds > info.fine) break;
-      giorni.add(giorno.getDay());
-      giorno.setDate(giorno.getDate() + 1);
-    }
-    return [...giorni];
-  } catch {
-    return null;
+// ── Assenze e permessi ──
+// Ogni barbiere di /api/admin/barbieri ha b.assenze: un record per ogni assenza/permesso
+// { id, tipo: "assente" | "permesso", data_inizio, data_fine (null = senza fine), ora_inizio, ora_fine, motivo }
+type Assenza = {
+  id: string; tipo: "assente" | "permesso"; data_inizio: string; data_fine: string | null;
+  ora_inizio: string | null; ora_fine: string | null; motivo: string | null;
+};
+const copreData = (a: Assenza, dataStr: string) =>
+  a.data_inizio <= dataStr && (!a.data_fine || a.data_fine >= dataStr);
+
+// Giorni della settimana coperti da un'assenza/permesso (null = tutti: assenza senza fine)
+const giorniAssenza = (a: Assenza): number[] | null => {
+  if (a.tipo === "permesso") return [giornoSettimana(a.data_inizio)];
+  if (!a.data_fine) return null;
+  const giorni = new Set<number>();
+  const [y, m, d] = a.data_inizio.split("-").map(Number);
+  const giorno = new Date(y, m - 1, d);
+  for (let i = 0; i < 7; i++) {
+    const ds = `${giorno.getFullYear()}-${String(giorno.getMonth() + 1).padStart(2, "0")}-${String(giorno.getDate()).padStart(2, "0")}`;
+    if (ds > a.data_fine) break;
+    giorni.add(giorno.getDay());
+    giorno.setDate(giorno.getDate() + 1);
   }
+  return [...giorni];
 };
 // L'assenza/permesso riguarda questa sede? Solo se cade in un giorno in cui il barbiere lavora qui.
-const assenzaInSede = (b: any) => {
+const assenzaInSede = (b: any, a: Assenza) => {
   const lavoro: number[] = Array.isArray(b.giorni_lavoro) ? b.giorni_lavoro : [];
-  const giorni = giorniAssenza(b);
+  const giorni = giorniAssenza(a);
   return giorni === null ? lavoro.length > 0 : giorni.some((g) => lavoro.includes(g));
 };
+const minutiDa = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
 
 const MESI_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const GIORNI_IT = ["Lu","Ma","Me","Gi","Ve","Sa","Do"];
@@ -337,8 +343,6 @@ export default function AdminDashboard() {
   const [prenotazioni, setPrenotazioni] = useState<any[]>([]);
   const [barbieri, setBarbieri] = useState<any[]>([]);
   const [tuttiBarbieri, setTuttiBarbieri] = useState<any[]>([]);
-  const [barbieriAssenti, setBarbieriAssenti] = useState<any[]>([]);
-  const [barbieriProgrammati, setBarbieriProgrammati] = useState<any[]>([]);
   const [servizi, setServizi] = useState<any[]>([]);
   const [filtroBarbiere, setFiltroBarbiere] = useState<number | null>(null);
   const [showFiltri, setShowFiltri] = useState(false);
@@ -394,7 +398,9 @@ export default function AdminDashboard() {
   // un admin solo i propri, il titolare (super_admin) quelli di tutti (stessa regola del backend).
   const puoGestireAssenze = (barbId: number) =>
     utente?.ruolo === "super_admin" || (utente?.barbiere_id != null && barbId === utente.barbiere_id);
-  const barbieriGestibili = barbieri.filter((b) => !b.assente && puoGestireAssenze(b.id));
+  // Tutti i barbieri della sede (non solo quelli in turno oggi): assenze e permessi si programmano anche
+  // per altre date, e se ne possono aggiungere più di uno per barbiere
+  const barbieriGestibili = (tuttiBarbieri.length > 0 ? tuttiBarbieri : barbieri).filter((b: any) => puoGestireAssenze(b.id));
   // "La mia agenda" = filtro sul barbiere loggato; "Agenda globale" = tutti i barbieri
   const filtroPerTab = (tab: typeof activeTab) => (tab === "mia" ? utente?.barbiere_id ?? null : null);
   const vaiATab = (tab: typeof activeTab) => {
@@ -481,16 +487,8 @@ export default function AdminDashboard() {
         `${BACKEND_URL}/api/admin/barbieri?sede_id=${sedeCorrente}`,
       );
       const allBarb = await resAll.json();
-      if (Array.isArray(allBarb)) {
-        setTuttiBarbieri(allBarb);
-        // Banner assenze/permessi solo nella sede in cui il barbiere avrebbe lavorato in quei giorni
-        setBarbieriAssenti(allBarb.filter((b: any) => b.assente && assenzaInSede(b)));
-        setBarbieriProgrammati(allBarb.filter((b: any) => {
-          if (b.assente || !b.motivo_assenza?.startsWith("{") || !assenzaInSede(b)) return false;
-          try { return JSON.parse(b.motivo_assenza).stato === "programmato"; }
-          catch { return false; }
-        }));
-      }
+      // Ogni barbiere include le sue assenze/permessi (b.assenze): banner e overlay ne derivano
+      if (Array.isArray(allBarb)) setTuttiBarbieri(allBarb);
     } catch (err) {
       setBarbieri([]);
     }
@@ -673,15 +671,13 @@ export default function AdminDashboard() {
     } catch (err) { msg("Errore"); }
   };
 
-  const riattiva = async (id: number) => {
+  // Annulla UNA assenza/permesso (gli altri dello stesso barbiere restano)
+  const annullaAssenza = async (assenzaId: string) => {
     try {
-      const res = await fetchAuth(`${BACKEND_URL}/api/admin/barbiere-presente`, {
-        method: "POST",
-        body: JSON.stringify({ barbiere_id: id }),
-      });
+      const res = await fetchAuth(`${BACKEND_URL}/api/admin/assenze/${assenzaId}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
-        msg("Barbiere riattivato!");
+        msg(data.messaggio || "Annullato");
         caricaBarbieri();
         caricaPrenotazioni();
       } else msg(data.error);
@@ -864,14 +860,56 @@ export default function AdminDashboard() {
       return d.toLocaleDateString("it-IT", { day: "numeric", month: "long" });
     } catch { return s; }
   };
-  const isPermessoBarbiere = (b: any) => {
-    if (!b.motivo_assenza) return false;
-    if (b.motivo_assenza.startsWith("permesso:")) return true;
-    if (b.motivo_assenza.startsWith("{")) {
-      try { return JSON.parse(b.motivo_assenza).tipo === "permesso"; }
-      catch { return false; }
-    }
-    return false;
+  // Tutte le assenze/permessi (in corso e futuri) che riguardano la sede corrente, in ordine di data
+  const assenzeSede = tuttiBarbieri
+    .flatMap((b: any) => (b.assenze || [])
+      .filter((a: Assenza) => assenzaInSede(b, a))
+      .map((a: Assenza) => ({ ...a, barbiere: b })))
+    .sort((x: any, y: any) =>
+      (x.data_inizio + (x.ora_inizio || "")).localeCompare(y.data_inizio + (y.ora_inizio || "")));
+
+  // Per la data selezionata: barbiere assente tutto il giorno? E le fasce di TUTTI i suoi permessi
+  const assenzeDelGiorno = (b: any) => {
+    const delGiorno: Assenza[] = (b?.assenze || []).filter((a: Assenza) => copreData(a, dataCorrente));
+    return {
+      assente: delGiorno.some((a) => a.tipo === "assente"),
+      permessi: delGiorno.filter((a) => a.tipo === "permesso"),
+    };
+  };
+  // Posizione nella griglia (top/height) della fascia di un permesso
+  const fasciaPermesso = (a: Assenza, SLOT_H: number) => {
+    const inizio = Math.floor(minutiDa(a.ora_inizio!) / 20) * 20;
+    const idx = orariGiornata.indexOf(`${String(Math.floor(inizio / 60)).padStart(2, "0")}:${String(inizio % 60).padStart(2, "0")}`);
+    if (idx === -1) return null;
+    return { top: idx * SLOT_H, height: Math.ceil((minutiDa(a.ora_fine!) - inizio) / 20) * SLOT_H };
+  };
+
+  // Banner di un'assenza/permesso, con "Annulla" per chi può gestirlo
+  const bannerAssenza = (a: any, style?: any) => {
+    const inCorso = copreData(a, todayStr);
+    const isP = a.tipo === "permesso";
+    const icona = inCorso ? (isP ? "🟡" : "🔴") : "🕓";
+    const titolo = isP
+      ? `${a.barbiere.nome} — ${inCorso ? "in permesso oggi" : "permesso programmato"}`
+      : `${a.barbiere.nome} — ${inCorso ? "assente" : "assenza programmata"}`;
+    const dettaglio = isP
+      ? `il ${fmtDataShort(a.data_inizio)} dalle ${a.ora_inizio} alle ${a.ora_fine}`
+      : a.data_fine
+        ? a.data_fine === a.data_inizio ? `il ${fmtDataShort(a.data_inizio)}` : `dal ${fmtDataShort(a.data_inizio)} al ${fmtDataShort(a.data_fine)}`
+        : `dal ${fmtDataShort(a.data_inizio)}, senza data di fine`;
+    return (
+      <View key={a.id} style={[st.absCard, !inCorso && { borderColor: "rgba(212,175,55,0.2)", backgroundColor: "rgba(212,175,55,0.03)" }, style]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[st.absText, !inCorso && { color: "#888" }]}>{icona} {titolo}</Text>
+          <Text style={{ color: "#666", fontSize: 11, marginTop: 2 }}>{dettaglio}</Text>
+        </View>
+        {puoGestireAssenze(a.barbiere.id) && (
+          <Pressable style={st.absBtn} onPress={() => annullaAssenza(a.id)}>
+            <Text style={st.absBtnText}>Annulla</Text>
+          </Pressable>
+        )}
+      </View>
+    );
   };
 
   if (loading)
@@ -1044,49 +1082,10 @@ export default function AdminDashboard() {
             )}
 
             {/* Card per barbiere — solo su giorni aperti, solo i barbieri di turno quel giorno */}
-            {(barbieriAssenti.length > 0 || barbieriProgrammati.length > 0) && (
+            {/* Una card per OGNI assenza/permesso che riguarda questa sede (anche più di uno per barbiere) */}
+            {assenzeSede.length > 0 && (
               <View style={{ marginTop: 16, paddingHorizontal: 16, gap: 8 }}>
-                {barbieriAssenti.map((b) => (
-                  <View key={b.id} style={[st.absCard, { marginBottom: 0 }]}>
-                    <Text style={st.absText}>{isPermessoBarbiere(b) ? "🟡" : "🔴"} {b.nome} {isPermessoBarbiere(b) ? "è in permesso" : "è assente"}</Text>
-                    {puoGestireAssenze(b.id) && (
-                    <Pressable style={st.absBtn} onPress={() => riattiva(b.id)}>
-                      <Text style={st.absBtnText}>Riattiva</Text>
-                    </Pressable>
-                    )}
-                  </View>
-                ))}
-                {barbieriProgrammati.map((b) => {
-                  const info = JSON.parse(b.motivo_assenza);
-                  const isP = info.tipo === "permesso";
-                  const durataStr = (() => {
-                    if (isP) {
-                      const dataStr = fmtDataShort(info.inizio.slice(0, 10));
-                      const oraI = info.inizio.slice(11, 16);
-                      const oraF = info.fine.slice(11, 16);
-                      return `il ${dataStr} dalle ${oraI} alle ${oraF}`;
-                    }
-                    const inizio = info.inizio;
-                    const fine = info.fine;
-                    const giorni = info.giorni;
-                    return fine
-                      ? `dal ${fmtDataShort(inizio)} al ${fmtDataShort(fine)}${giorni ? ` (${giorni} ${giorni === 1 ? "giorno" : "giorni"})` : ""}`
-                      : `dal ${fmtDataShort(inizio)}`;
-                  })();
-                  return (
-                    <View key={b.id} style={[st.absCard, { borderColor: "rgba(212,175,55,0.2)", backgroundColor: "rgba(212,175,55,0.03)", marginBottom: 0 }]}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[st.absText, { color: "#888" }]}>🕓 {b.nome} — {isP ? "permesso programmato" : "assenza programmata"}</Text>
-                        <Text style={{ color: "#666", fontSize: 11, marginTop: 2 }}>{durataStr}</Text>
-                      </View>
-                      {puoGestireAssenze(b.id) && (
-                      <Pressable style={st.absBtn} onPress={() => riattiva(b.id)}>
-                        <Text style={st.absBtnText}>Annulla</Text>
-                      </Pressable>
-                      )}
-                    </View>
-                  );
-                })}
+                {assenzeSede.map((a: any) => bannerAssenza(a, { marginBottom: 0 }))}
               </View>
             )}
 
@@ -1107,8 +1106,10 @@ export default function AdminDashboard() {
                     const slotsTotal = orariGiornata.length;
                     const pct = slotsTotal > 0 ? Math.min(100, (slotsOccupati / slotsTotal) * 100) : 0;
                     const color = getBarbColor(b.id);
-                    const isAssente = b.assente;
-                    const isPermesso = isPermessoBarbiere(b);
+                    // Stato nella data selezionata: assente tutto il giorno o con uno o più permessi
+                    const giorno = assenzeDelGiorno(b);
+                    const isAssente = giorno.assente;
+                    const nPermessi = giorno.permessi.length;
                     return (
                       <View
                         key={b.id}
@@ -1125,9 +1126,9 @@ export default function AdminDashboard() {
                           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />
                             <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 15 }}>{b.nome}</Text>
-                            {isAssente && (
-                              <Text style={{ color: isPermesso ? "#FFA500" : "#F44336", fontSize: 11, fontWeight: "600" }}>
-                                {isPermesso ? "in permesso" : "assente"}
+                            {(isAssente || nPermessi > 0) && (
+                              <Text style={{ color: isAssente ? "#F44336" : "#FFA500", fontSize: 11, fontWeight: "600" }}>
+                                {isAssente ? "assente" : nPermessi === 1 ? "1 permesso" : `${nPermessi} permessi`}
                               </Text>
                             )}
                           </View>
@@ -1203,7 +1204,7 @@ export default function AdminDashboard() {
                   <Text style={[st.filtroItemText, filtroBarbiere === null && st.filtroItemTextA]}>👥 Tutti i Barbieri</Text>
                 </Pressable>
                 <View style={{ height: 1, backgroundColor: "#1A1A1A", marginVertical: 4 }} />
-                {barbieri.filter((b) => !b.assente).map((b) => (
+                {barbieri.filter((b) => !b.disabilitato).map((b) => (
                   <Pressable key={b.id} style={[st.filtroItem, filtroBarbiere === b.id && st.filtroItemA]} onPress={() => { setFiltroBarbiere(b.id); setShowFiltri(false); }}>
                     <Text style={[st.filtroItemText, filtroBarbiere === b.id && st.filtroItemTextA]}>💈 {b.nome}</Text>
                   </Pressable>
@@ -1218,30 +1219,8 @@ export default function AdminDashboard() {
               </Pressable>
             </View>
 
-            {barbieriAssenti.map((b) => (
-              <View key={b.id} style={st.absCard}>
-                <Text style={st.absText}>{isPermessoBarbiere(b) ? "🟡" : "🔴"} {b.nome} {isPermessoBarbiere(b) ? "è in permesso" : "è assente"}</Text>
-                {puoGestireAssenze(b.id) && (
-                <Pressable style={st.absBtn} onPress={() => riattiva(b.id)}>
-                  <Text style={st.absBtnText}>Riattiva</Text>
-                </Pressable>
-                )}
-              </View>
-            ))}
-            {barbieriProgrammati.map((b) => {
-              const info = JSON.parse(b.motivo_assenza);
-              const dataInizio = info.inizio.slice(0, 10);
-              return (
-                <View key={b.id} style={[st.absCard, { borderColor: "rgba(212,175,55,0.2)", backgroundColor: "rgba(212,175,55,0.03)" }]}>
-                  <Text style={[st.absText, { color: "#888" }]}>🕓 {b.nome} — {info.tipo === "permesso" ? "permesso" : "assenza"} prog. il {fmtDataShort(dataInizio)}</Text>
-                  {puoGestireAssenze(b.id) && (
-                  <Pressable style={st.absBtn} onPress={() => riattiva(b.id)}>
-                    <Text style={st.absBtnText}>Annulla</Text>
-                  </Pressable>
-                  )}
-                </View>
-              );
-            })}
+            {/* Una card per ogni assenza/permesso che riguarda questa sede */}
+            {assenzeSede.map((a: any) => bannerAssenza(a))}
             {orariGiornata.length === 0 ? (
               <View style={st.emptyBox}>
                 <Text style={{ fontSize: 40, marginBottom: 12 }}>🔒</Text>
@@ -1288,84 +1267,28 @@ export default function AdminDashboard() {
                     {/* Colonna appuntamenti */}
                     {(() => {
                       const bData = prenotazioniPerBarbiere[0];
-                      const calcPermOvS = (motivo: string) => {
-                        try {
-                          const info = JSON.parse(motivo);
-                          if (info.tipo !== "permesso") return null;
-                          const inizio = new Date(info.inizio);
-                          const fine = new Date(info.fine);
-                          const sm = inizio.getHours() * 60 + inizio.getMinutes();
-                          const ss = Math.floor(sm / 20) * 20;
-                          const oraS = `${String(Math.floor(ss/60)).padStart(2,"0")}:${String(ss%60).padStart(2,"0")}`;
-                          const si = orariGiornata.indexOf(oraS);
-                          if (si === -1) return null;
-                          const durMin = Math.round((fine.getTime() - inizio.getTime()) / 60000);
-                          return { top: si * SLOT_H, height: Math.ceil(durMin / 20) * SLOT_H };
-                        } catch { return null; }
-                      };
-                      let soloOverlayTipo: "assente" | "permesso" | null = null;
-                      let soloPermOv: { top: number; height: number } | null = null;
-                      if (bData?.assente) {
-                        if (!isPermessoBarbiere(bData)) {
-                          try {
-                            const info = JSON.parse(bData.motivo_assenza || "{}");
-                            if (!info.inizio || (dataCorrente >= info.inizio && (!info.fine || dataCorrente <= info.fine))) {
-                              soloOverlayTipo = "assente";
-                            }
-                          } catch { soloOverlayTipo = "assente"; }
-                        } else if (bData.motivo_assenza) {
-                          try {
-                            const info = JSON.parse(bData.motivo_assenza);
-                            const localD = info.inizio.slice(0, 10);
-                            if (localD === dataCorrente) {
-                              soloOverlayTipo = "permesso";
-                              soloPermOv = calcPermOvS(bData.motivo_assenza);
-                            }
-                          } catch {}
-                        }
-                      } else if (bData) {
-                        const prog = barbieriProgrammati.find((bp: any) => {
-                          if (bp.id !== bData.id) return false;
-                          try {
-                            const info = JSON.parse(bp.motivo_assenza);
-                            if (info.tipo === "permesso") {
-                              return info.inizio.slice(0, 10) === dataCorrente;
-                            }
-                            if (info.tipo === "assente") {
-                              return dataCorrente >= info.inizio && (!info.fine || dataCorrente <= info.fine);
-                            }
-                            return false;
-                          } catch { return false; }
-                        });
-                        if (prog) {
-                          try {
-                            const info = JSON.parse(prog.motivo_assenza);
-                            if (info.tipo === "permesso") {
-                              soloOverlayTipo = "permesso";
-                              soloPermOv = calcPermOvS(prog.motivo_assenza);
-                            } else {
-                              soloOverlayTipo = "assente";
-                            }
-                          } catch {}
-                        }
-                      }
+                      // Overlay della data selezionata: assenza intera e/o fasce di TUTTI i permessi
+                      const soloGiorno = assenzeDelGiorno(bData);
+                      const soloFasce = soloGiorno.permessi
+                        .map((a) => ({ id: a.id, pos: fasciaPermesso(a, SLOT_H) }))
+                        .filter((f) => f.pos !== null) as { id: string; pos: { top: number; height: number } }[];
                       return (
                         <View style={{ flex: 1, height: totalH, borderLeftWidth: 1, borderLeftColor: "#1E1E1E" }}>
                           {orariGiornata.map((ora, idx) => (
                             <View key={ora} style={{ position: "absolute", top: idx * SLOT_H, left: 0, right: 0, height: 1, backgroundColor: "#1A1A1A" }} />
                           ))}
                           {/* Overlay assente — intera colonna (sotto le card) */}
-                          {soloOverlayTipo === "assente" && (
+                          {soloGiorno.assente && (
                             <View style={{ position: "absolute", top: 0, left: 0, right: 0, height: totalH, backgroundColor: "rgba(15,0,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
                               <Text style={{ color: "#F44336", fontSize: 11, fontWeight: "800", letterSpacing: 1 }}>ASSENTE</Text>
                             </View>
                           )}
-                          {/* Overlay permesso — fascia oraria (sotto le card) */}
-                          {soloOverlayTipo === "permesso" && soloPermOv && (
-                            <View style={{ position: "absolute", top: soloPermOv.top, left: 0, right: 0, height: soloPermOv.height, backgroundColor: "rgba(30,15,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
+                          {/* Overlay permessi — una fascia per ogni permesso del giorno (sotto le card) */}
+                          {!soloGiorno.assente && soloFasce.map((f) => (
+                            <View key={f.id} style={{ position: "absolute", top: f.pos.top, left: 0, right: 0, height: f.pos.height, backgroundColor: "rgba(30,15,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
                               <Text style={{ color: "#E5734A", fontSize: 10, fontWeight: "800", letterSpacing: 1 }}>PERMESSO</Text>
                             </View>
-                          )}
+                          ))}
                           {appsBarb.map((app: any) => {
                             const startStr = (app.ora || "").slice(0, 5);
                             const startIdx = orariGiornata.indexOf(startStr);
@@ -1455,71 +1378,11 @@ export default function AdminDashboard() {
                       const color = getBarbColor(b.id);
                       const appsBarb = attivi.filter((p: any) => p.barbiere_id === b.id);
 
-                      // Calcola overlay: assenza attiva, permesso attivo, o permesso programmato per oggi
-                      const calcPermOv = (motivo: string) => {
-                        try {
-                          const info = JSON.parse(motivo);
-                          if (info.tipo !== "permesso") return null;
-                          const inizio = new Date(info.inizio);
-                          const fine = new Date(info.fine);
-                          const sm = inizio.getHours() * 60 + inizio.getMinutes();
-                          const ss = Math.floor(sm / 20) * 20;
-                          const oraS = `${String(Math.floor(ss/60)).padStart(2,"0")}:${String(ss%60).padStart(2,"0")}`;
-                          const si = orariGiornata.indexOf(oraS);
-                          if (si === -1) return null;
-                          const durMin = Math.round((fine.getTime() - inizio.getTime()) / 60000);
-                          return { top: si * SLOT_H, height: Math.ceil(durMin / 20) * SLOT_H };
-                        } catch { return null; }
-                      };
-                      let overlayTipo: "assente" | "permesso" | null = null;
-                      let permOv: { top: number; height: number } | null = null;
-                      if (b.assente) {
-                        if (!isPermessoBarbiere(b)) {
-                          // Assenza piena: mostra overlay solo nei giorni compresi tra inizio e fine
-                          try {
-                            const info = JSON.parse(b.motivo_assenza || "{}");
-                            if (!info.inizio || (dataCorrente >= info.inizio && (!info.fine || dataCorrente <= info.fine))) {
-                              overlayTipo = "assente";
-                            }
-                          } catch { overlayTipo = "assente"; }
-                        } else if (b.motivo_assenza) {
-                          // Permesso attivo: mostra overlay solo nel giorno del permesso (data locale)
-                          try {
-                            const info = JSON.parse(b.motivo_assenza);
-                            const localD = info.inizio.slice(0, 10);
-                            if (localD === dataCorrente) {
-                              overlayTipo = "permesso";
-                              permOv = calcPermOv(b.motivo_assenza);
-                            }
-                          } catch {}
-                        }
-                      } else {
-                        // Assenza o permesso programmato per la data corrente
-                        const prog = barbieriProgrammati.find((bp: any) => {
-                          if (bp.id !== b.id) return false;
-                          try {
-                            const info = JSON.parse(bp.motivo_assenza);
-                            if (info.tipo === "permesso") {
-                              return info.inizio.slice(0, 10) === dataCorrente;
-                            }
-                            if (info.tipo === "assente") {
-                              return dataCorrente >= info.inizio && (!info.fine || dataCorrente <= info.fine);
-                            }
-                            return false;
-                          } catch { return false; }
-                        });
-                        if (prog) {
-                          try {
-                            const info = JSON.parse(prog.motivo_assenza);
-                            if (info.tipo === "permesso") {
-                              overlayTipo = "permesso";
-                              permOv = calcPermOv(prog.motivo_assenza);
-                            } else {
-                              overlayTipo = "assente";
-                            }
-                          } catch {}
-                        }
-                      }
+                      // Overlay della data selezionata: assenza intera e/o fasce di TUTTI i permessi
+                      const giorno = assenzeDelGiorno(b);
+                      const fasce = giorno.permessi
+                        .map((a) => ({ id: a.id, pos: fasciaPermesso(a, SLOT_H) }))
+                        .filter((f) => f.pos !== null) as { id: string; pos: { top: number; height: number } }[];
 
                       return (
                         <View key={b.id} style={{ flex: 1, height: totalH, borderLeftWidth: 1, borderLeftColor: "#1E1E1E" }}>
@@ -1528,17 +1391,17 @@ export default function AdminDashboard() {
                             <View key={ora} style={{ position: "absolute", top: idx * SLOT_H, left: 0, right: 0, height: 1, backgroundColor: "#1A1A1A" }} />
                           ))}
                           {/* Overlay assente — intera colonna (sotto le card) */}
-                          {overlayTipo === "assente" && (
+                          {giorno.assente && (
                             <View style={{ position: "absolute", top: 0, left: 0, right: 0, height: totalH, backgroundColor: "rgba(15,0,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
                               <Text style={{ color: "#F44336", fontSize: 11, fontWeight: "800", letterSpacing: 1 }}>ASSENTE</Text>
                             </View>
                           )}
-                          {/* Overlay permesso — fascia oraria (sotto le card) */}
-                          {overlayTipo === "permesso" && permOv && (
-                            <View style={{ position: "absolute", top: permOv.top, left: 0, right: 0, height: permOv.height, backgroundColor: "rgba(30,15,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
+                          {/* Overlay permessi — una fascia per ogni permesso del giorno (sotto le card) */}
+                          {!giorno.assente && fasce.map((f) => (
+                            <View key={f.id} style={{ position: "absolute", top: f.pos.top, left: 0, right: 0, height: f.pos.height, backgroundColor: "rgba(30,15,0,0.72)", alignItems: "center", justifyContent: "center", zIndex: 1 }}>
                               <Text style={{ color: "#E5734A", fontSize: 10, fontWeight: "800", letterSpacing: 1 }}>PERMESSO</Text>
                             </View>
-                          )}
+                          ))}
                           {/* Card appuntamenti (sopra l'overlay) */}
                           {prenotazioni.filter((p: any) => p.barbiere_id === b.id).map((app: any) => {
                             const startStr = (app.ora || "").slice(0, 5);
@@ -1989,7 +1852,6 @@ export default function AdminDashboard() {
         const [oraH, oraM] = permessoOraInizio.split(":");
         const totMin = (parseInt(oraH) || 0) * 60 + (parseInt(oraM) || 0) + permessoMinuti;
         const oraFineStr = `${String(Math.floor(totMin / 60) % 24).padStart(2,"0")}:${String(totMin % 60).padStart(2,"0")}`;
-        const haGiaPermesso = tuttiBarbieri.find((b: any) => b.id === assenzaBarbiere)?.motivo_assenza;
         const righe = [
           { label: "Barbiere", value: barbNome },
           { label: "Data", value: fmtDataLunga(permessoData) },
@@ -2016,11 +1878,6 @@ export default function AdminDashboard() {
                   </View>
                 ))}
               </View>
-              {haGiaPermesso && (
-                <Text style={{ color: "#D4AF37", fontSize: 12, marginBottom: 12, lineHeight: 17 }}>
-                  ⚠️ Questo barbiere ha già un permesso/assenza attiva — verrà sostituita.
-                </Text>
-              )}
               <Text style={{ color: "#E5734A", fontSize: 12, marginBottom: 20, lineHeight: 17 }}>
                 Gli appuntamenti nel periodo indicato verranno cancellati.
               </Text>
