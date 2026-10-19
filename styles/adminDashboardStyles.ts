@@ -17,7 +17,7 @@ export const st = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginTop: 10,
+    marginTop: 18,
     marginBottom: 16,
   },
   headerLabel: {
