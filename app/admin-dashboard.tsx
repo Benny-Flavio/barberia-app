@@ -4,9 +4,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
@@ -63,15 +61,6 @@ LocaleConfig.locales["it"] = {
 LocaleConfig.defaultLocale = "it";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
-
-// Web/PWA: in alto barra di stato + piccolo respiro; in basso niente padding sul container,
-// perché l'area della home bar è gestita una sola volta dentro la barra di navigazione.
-const SAFE_CONTAINER_WEB = Platform.OS === "web"
-  ? { paddingTop: "calc(env(safe-area-inset-top, 0px) + 8px)" as any, paddingBottom: 0 }
-  : null;
-const SAFE_BAR_WEB = Platform.OS === "web"
-  ? { paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 6px)" as any }
-  : null;
 
 const MESI_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
 const GIORNI_IT = ["Lu","Ma","Me","Gi","Ve","Sa","Do"];
@@ -921,7 +910,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <SafeAreaView style={[st.container, SAFE_CONTAINER_WEB]}>
+    <View style={st.container}>
       {/* HEADER */}
       <Animated.View style={[st.header, { opacity: headerOp }]}>
         <View>
@@ -1559,9 +1548,8 @@ export default function AdminDashboard() {
         )}
       </ScrollView>
 
-      {/* BOTTOM TAB BAR */}
-      <View style={st.bottomBarWrap}>
-        <View style={[st.bottomBar, SAFE_BAR_WEB]}>
+      {/* BOTTOM TAB BAR — fissa sul fondo (position absolute) */}
+      <View style={st.bottomBar}>
           <Pressable style={[st.bottomTab, activeTab === "home" && st.bottomTabA]} onPress={() => vaiATab("home")}>
             <Text style={{ fontSize: 20 }}>🏠</Text>
             <Text numberOfLines={1} style={[st.bottomTabLabel, activeTab === "home" && st.bottomTabLabelA]}>Home</Text>
@@ -1577,7 +1565,6 @@ export default function AdminDashboard() {
             <Text style={{ fontSize: 20 }}>📅</Text>
             <Text numberOfLines={1} style={[st.bottomTabLabel, activeTab === "globale" && st.bottomTabLabelA]}>Agenda globale</Text>
           </Pressable>
-        </View>
       </View>
 
       {/* MODAL AGGIUNGI — STEP 1: FORM */}
@@ -2317,6 +2304,6 @@ export default function AdminDashboard() {
         </View>
       )}
       <GuidaInstallazione userId={utente?.id?.toString() || ""} />
-    </SafeAreaView>
+    </View>
   );
 }

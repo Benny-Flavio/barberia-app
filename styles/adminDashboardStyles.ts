@@ -2,16 +2,16 @@ import { Dimensions, StyleSheet } from "react-native";
 
 const { height: SH } = Dimensions.get("window");
 export const SHEET_H = SH * 0.82;
+// Altezza fissa della bottom bar (contenuto + 20px per la home bar dell'iPhone)
+export const BOTTOM_BAR_H = 84;
 
 export const st = StyleSheet.create({
-  // Padding in longhand: su web SafeAreaView imposta paddingTop/Right/Bottom/Left = safe-area
-  // insets, e in react-native-web i longhand vincono sullo shorthand `padding` (che veniva ignorato).
+  // Valori fissi (niente safe-area dinamica): paddingTop 50 per scendere sotto il notch,
+  // paddingBottom = altezza della bottom bar, così l'area scrollabile finisce prima della barra.
   container: {
-    flex: 1, backgroundColor: "#0A0A0A", overflow: "hidden" as any,
-    paddingTop: 20, paddingRight: 20, paddingBottom: 20, paddingLeft: 20,
+    flex: 1, width: "100%", backgroundColor: "#0A0A0A", overflow: "hidden" as any,
+    paddingTop: 50, paddingBottom: BOTTOM_BAR_H,
   },
-  // Barra di navigazione: esce dal padding laterale del container per stare a tutta larghezza
-  bottomBarWrap: { marginLeft: -20, marginRight: -20 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -22,7 +22,7 @@ export const st = StyleSheet.create({
   headerLabel: {
     fontSize: 10,
     fontWeight: "700",
-    color: "#555",
+    color: "#8A8A8A",
     letterSpacing: 3,
   },
   headerBrand: {
@@ -715,18 +715,22 @@ export const st = StyleSheet.create({
   },
 
   // Bottom tab bar
-  // A tutta larghezza e appoggiata al bordo inferiore; l'area della home bar
-  // (safe-area-inset-bottom) è aggiunta come paddingBottom dentro la barra.
+  // Fissa sul fondo, altezza fissa; paddingBottom 20 per la home bar dell'iPhone
   bottomBar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: "100%",
+    height: BOTTOM_BAR_H,
     flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#141414",
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
     borderTopWidth: 1,
     borderColor: "#252525",
     paddingTop: 6,
-    paddingBottom: 6,
-    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingHorizontal: 12,
     shadowColor: "#000",
     shadowOpacity: 0.45,
     shadowRadius: 16,
