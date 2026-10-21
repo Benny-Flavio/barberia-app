@@ -1,20 +1,25 @@
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
-import { router, Stack } from "expo-router";
+import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { Dimensions, View } from "react-native";
-import { supabase } from "../lib/supabase";
-
-const isDesktop = Dimensions.get("window").width > 768;
+import { View } from "react-native";
+import { sessioneDiQuestaScheda, supabase } from "../lib/supabase";
 
 export default function RootLayout() {
+  const pathname = usePathname();
+  // Area staff a tutta larghezza; le pagine cliente su desktop restano in una colonna di max 1100px.
+  // La larghezza NON si calcola in JS (Dimensions al caricamento del modulo): la pagina è
+  // pre-renderizzata al build senza schermo, e dopo un refresh il layout cambiava. Ci pensa una
+  // media query CSS in app/+html.tsx (#app-colonna), uguale in pre-render e nel browser.
+  const areaStaff = pathname.startsWith("/admin-dashboard");
+
   useEffect(() => {
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") {
-        router.replace("/" as any);
-      }
+    } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event !== "SIGNED_OUT") return;
+      // Anche i logout delle ALTRE schede arrivano qui: torna al login solo se è uscita QUESTA scheda
+      if (!(await sessioneDiQuestaScheda())) router.replace("/" as any);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -22,7 +27,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={DarkTheme}>
       <View style={{ flex: 1, backgroundColor: "#0A0A0A" }}>
-        <View style={{ flex: 1, maxWidth: isDesktop ? 1100 : undefined, width: "100%", alignSelf: isDesktop ? ("center" as any) : undefined }}>
+        <View nativeID={areaStaff ? "app-piena" : "app-colonna"} style={{ flex: 1, width: "100%" }}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="home" />

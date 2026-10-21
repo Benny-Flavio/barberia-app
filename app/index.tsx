@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { supabase } from "../lib/supabase";
+import { sessioneDiQuestaScheda, supabase } from "../lib/supabase";
 import { s } from "../styles/indexStyles";
 
 type LoginStep = "email" | "otp_code" | "password";
@@ -57,6 +57,9 @@ export default function Login() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session) {
+        // Ignora i login fatti in un'ALTRA scheda (es. admin mentre qui si entra come cliente)
+        const mia = await sessioneDiQuestaScheda();
+        if (mia?.user.id !== session.user.id) return;
         await AsyncStorage.removeItem("utente");
         // Pausa per mostrare il feedback verde dei box OTP prima del redirect
         await new Promise(resolve => setTimeout(resolve, 700));
