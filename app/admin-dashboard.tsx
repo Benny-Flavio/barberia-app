@@ -452,6 +452,13 @@ export default function AdminDashboard() {
       });
       if (!meRes.ok) { setLoading(false); router.replace("/"); return; }
       const meData = await meRes.json();
+      // ROUTE GUARD: il ruolo arriva dal backend (profili.ruolo), non da dati salvati nel browser.
+      // Chi non è staff non vede nulla della dashboard (resta lo spinner) e torna alla sua home.
+      // Le API /api/admin/* rifiutano comunque i clienti con 403 lato server.
+      if (meData?.utente?.ruolo !== "admin" && meData?.utente?.ruolo !== "super_admin") {
+        router.replace("/home");
+        return;
+      }
       const u = { ...meData.utente, email: session.user.email };
       setToken(session.access_token);
       setUtente(u);

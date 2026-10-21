@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { sessioneDiQuestaScheda, supabase } from "../lib/supabase";
+import { supabase } from "../lib/supabase";
 import { s } from "../styles/indexStyles";
 
 type LoginStep = "email" | "otp_code" | "password";
@@ -33,6 +33,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const redirecting = useRef(false);
+  const loginInCorso = useRef(false); // true solo quando l'utente conferma l'accesso in QUESTA scheda
   const otpInputRef = useRef<any>(null);
 
   const logoScale = useRef(new Animated.Value(0.5)).current;
@@ -57,9 +58,9 @@ export default function Login() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session) {
-        // Ignora i login fatti in un'ALTRA scheda (es. admin mentre qui si entra come cliente)
-        const mia = await sessioneDiQuestaScheda();
-        if (mia?.user.id !== session.user.id) return;
+        // Supabase notifica il login anche alle ALTRE schede aperte: si fa il redirect solo se
+        // l'accesso è stato avviato da questa scheda (niente salti di pagina "da soli")
+        if (!loginInCorso.current) return;
         await AsyncStorage.removeItem("utente");
         // Pausa per mostrare il feedback verde dei box OTP prima del redirect
         await new Promise(resolve => setTimeout(resolve, 700));
@@ -271,12 +272,14 @@ export default function Login() {
     if (otpCode.trim().length < 6) { setErrore("Inserisci il codice ricevuto per intero"); return; }
     setErrore("");
     setLoading(true);
+    loginInCorso.current = true;
     const { error } = await supabase.auth.verifyOtp({
       email: email.trim().toLowerCase(),
       token: otpCode.trim(),
       type: "email",
     });
     if (error) {
+      loginInCorso.current = false;
       setOtpStato("errato");
       setErrore("Codice non valido o scaduto. Riprova.");
       setLoading(false);
