@@ -919,9 +919,13 @@ export default function AdminDashboard() {
     );
   };
 
+  // key diverse per spinner e dashboard: il contenitore della dashboard è sempre un elemento
+  // NUOVO. Dopo un F5 lo spinner viene "agganciato" all'HTML pre-renderizzato (hydration) e può
+  // ereditarne classi CSS non aggiornate (es. align-items:center): non devono finire sulla dashboard.
   if (loading)
     return (
       <View
+        key="caricamento"
         style={[
           st.container,
           { justifyContent: "center", alignItems: "center" },
@@ -992,7 +996,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <View style={st.container}>
+    <View key="dashboard" style={st.container}>
       {/* HEADER */}
       <Animated.View style={[st.header, { opacity: headerOp }]}>
         <View>
