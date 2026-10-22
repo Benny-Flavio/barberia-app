@@ -83,9 +83,13 @@ export default function Home() {
     let u = JSON.parse((await AsyncStorage.getItem("utente")) || "{}");
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        // Se l'UUID in cache non corrisponde all'utente corrente, ignora la cache
-        if (u.uuid && u.uuid !== session.user.id) {
+      if (!session) {
+        // Nessuna sessione: la cache non appartiene a nessuno, non va mostrata
+        u = {};
+        await AsyncStorage.removeItem("utente");
+      } else if (session.access_token) {
+        // Se l'UUID in cache non corrisponde all'utente corrente (o manca), ignora la cache
+        if (u.uuid !== session.user.id) {
           u = {};
           await AsyncStorage.removeItem("utente");
         }

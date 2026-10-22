@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -5,8 +6,9 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 import { supabase } from "../lib/supabase";
 
-// ── Route guard per ruolo (unico punto, vale per tutte le pagine) ──
-// "/"                → login, libero
+// ── Auth guard + route guard per ruolo (unico punto, vale per tutte le pagine) ──
+// "/"                → login e registrazione: l'unica pagina accessibile senza sessione
+// qualsiasi altra    → serve una sessione valida, altrimenti si torna a "/"
 // "/admin-dashboard" → area staff: solo admin / super_admin
 // tutto il resto     → area cliente: gli account staff vengono rimandati alla dashboard
 const AREA_STAFF = ["/admin-dashboard"];
@@ -38,6 +40,7 @@ export default function RootLayout() {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") ruoloInCache = null;
       // Sessione condivisa tra le schede: dopo un logout (qui o altrove) non c'è più una sessione valida
       if (event === "SIGNED_OUT") {
+        AsyncStorage.removeItem("utente").catch(() => {}); // niente nome di un utente precedente in cache
         router.replace("/" as any);
       }
     });
@@ -51,14 +54,16 @@ export default function RootLayout() {
       try {
         const { loggato, ruolo } = await ruoloUtenteLoggato();
         if (id !== ultimaVerifica.current) return; // nel frattempo si è cambiata pagina
+        // Nessuna sessione valida: pagina mai mostrata, si torna al login
+        if (!loggato) return router.replace("/" as any);
         const areaStaff = AREA_STAFF.some((p) => pathname.startsWith(p));
-        if (loggato && areaStaff && !isStaff(ruolo)) return router.replace("/home" as any);
-        if (loggato && !areaStaff && isStaff(ruolo)) return router.replace("/admin-dashboard" as any);
-        // Senza login ogni pagina gestisce già il rimando al login (la dashboard lo fa da sé)
+        if (areaStaff && !isStaff(ruolo)) return router.replace("/home" as any);
+        if (!areaStaff && isStaff(ruolo)) return router.replace("/admin-dashboard" as any);
+        setVerificata(pathname);
       } catch {
-        // Errore di rete: si lascia decidere alla pagina (le API restano protette lato server)
+        // Verifica impossibile (es. errore di rete): la pagina non viene mostrata, si torna al login
+        if (id === ultimaVerifica.current) router.replace("/" as any);
       }
-      if (id === ultimaVerifica.current) setVerificata(pathname);
     })();
   }, [pathname]);
 
