@@ -1,15 +1,41 @@
 import { DarkTheme, ThemeProvider } from "@react-navigation/native";
-import { router, Stack } from "expo-router";
+import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
-import { View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
 import { supabase } from "../lib/supabase";
 
+// ── Route guard per ruolo (unico punto, vale per tutte le pagine) ──
+// "/"                → login, libero
+// "/admin-dashboard" → area staff: solo admin / super_admin
+// tutto il resto     → area cliente: gli account staff vengono rimandati alla dashboard
+const AREA_STAFF = ["/admin-dashboard"];
+const isStaff = (ruolo: string | null) => ruolo === "admin" || ruolo === "super_admin";
+
+// Ruolo dell'utente loggato, letto da profili (stessa fonte del login) e tenuto in memoria per utente
+let ruoloInCache: { userId: string; ruolo: string | null } | null = null;
+const ruoloUtenteLoggato = async (): Promise<{ loggato: boolean; ruolo: string | null }> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return { loggato: false, ruolo: null };
+  if (ruoloInCache?.userId !== session.user.id) {
+    const { data } = await supabase.from("profili").select("ruolo").eq("id", session.user.id).single();
+    ruoloInCache = { userId: session.user.id, ruolo: data?.ruolo ?? null };
+  }
+  return { loggato: true, ruolo: ruoloInCache.ruolo };
+};
+
 export default function RootLayout() {
+  const pathname = usePathname();
+  // Pagina per cui il controllo del ruolo è concluso; finché non lo è, la pagina resta coperta
+  const [verificata, setVerificata] = useState<string | null>(null);
+  const ultimaVerifica = useRef(0);
+
   useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
+      // Cambio di utente: il ruolo va riletto al prossimo cambio di pagina
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") ruoloInCache = null;
       // Sessione condivisa tra le schede: dopo un logout (qui o altrove) non c'è più una sessione valida
       if (event === "SIGNED_OUT") {
         router.replace("/" as any);
@@ -17,6 +43,26 @@ export default function RootLayout() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (pathname === "/") return;
+    const id = ++ultimaVerifica.current;
+    (async () => {
+      try {
+        const { loggato, ruolo } = await ruoloUtenteLoggato();
+        if (id !== ultimaVerifica.current) return; // nel frattempo si è cambiata pagina
+        const areaStaff = AREA_STAFF.some((p) => pathname.startsWith(p));
+        if (loggato && areaStaff && !isStaff(ruolo)) return router.replace("/home" as any);
+        if (loggato && !areaStaff && isStaff(ruolo)) return router.replace("/admin-dashboard" as any);
+        // Senza login ogni pagina gestisce già il rimando al login (la dashboard lo fa da sé)
+      } catch {
+        // Errore di rete: si lascia decidere alla pagina (le API restano protette lato server)
+      }
+      if (id === ultimaVerifica.current) setVerificata(pathname);
+    })();
+  }, [pathname]);
+
+  const inVerifica = pathname !== "/" && verificata !== pathname;
 
   // Layout fluido a tutta larghezza, senza calcoli sulla dimensione dello schermo: la pagina è
   // pre-renderizzata al build (senza schermo) e un valore calcolato in JS cambiava dopo un refresh.
@@ -35,6 +81,12 @@ export default function RootLayout() {
           <Stack.Screen name="messaggi" />
           <Stack.Screen name="admin-dashboard" />
         </Stack>
+        {/* Copre la pagina finché il ruolo non è verificato: nessun contenuto dell'area sbagliata a schermo */}
+        {inVerifica && (
+          <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#0A0A0A", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+            <ActivityIndicator color="#D4AF37" size="large" />
+          </View>
+        )}
         <StatusBar style="light" />
       </View>
     </ThemeProvider>
