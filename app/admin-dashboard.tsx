@@ -440,6 +440,29 @@ export default function AdminDashboard() {
     }).start();
     caricaDati();
   }, []);
+  // Sede iniziale = quella in cui il barbiere loggato è di turno OGGI. Stessa fonte delle colonne
+  // dell'agenda: turni_rotazione (sede + giorno della settimana), letta da /api/barbieri-disponibili
+  // per ogni sede, in parallelo. Se oggi non è di turno (o non è collegato a un barbiere, o il negozio
+  // è chiuso) resta la prima sede.
+  const sedeDiTurnoOggi = async (barbiereId: number | null, tutteSedi: any[]) => {
+    const predefinita = tutteSedi[0].id;
+    if (!barbiereId || tutteSedi.length < 2) return predefinita;
+    const d = new Date();
+    const oggi = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const sediDiTurno = await Promise.all(
+      tutteSedi.map(async (s) => {
+        try {
+          const res = await fetch(`${BACKEND_URL}/api/barbieri-disponibili?sede_id=${s.id}&data=${oggi}`);
+          const data = await res.json();
+          const inTurno = Array.isArray(data) ? data : data.barbieri || [];
+          return inTurno.some((b: any) => b.id === barbiereId) ? s.id : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    return sediDiTurno.find((id) => id !== null) ?? predefinita;
+  };
   const caricaDati = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -470,7 +493,7 @@ export default function AdminDashboard() {
       setEditNome(u.nome || "");
       const [tutteSedi, tuttiServizi] = await Promise.all([resSedi.json(), resServ.json()]);
       setSedi(tutteSedi);
-      if (tutteSedi.length > 0) setSedeCorrente(tutteSedi[0].id);
+      if (tutteSedi.length > 0) setSedeCorrente(await sedeDiTurnoOggi(u.barbiere_id, tutteSedi));
       setFiltroBarbiere(null);
       setServizi(tuttiServizi);
       setLoading(false);
