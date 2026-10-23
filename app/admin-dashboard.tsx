@@ -447,9 +447,14 @@ export default function AdminDashboard() {
         router.replace("/");
         return;
       }
-      const meRes = await fetch(`${BACKEND_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
-      });
+      // Profilo, sedi e servizi in PARALLELO (prima erano tre richieste una dopo l'altra)
+      const [meRes, resSedi, resServ] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        }),
+        fetch(`${BACKEND_URL}/api/sedi`),
+        fetch(`${BACKEND_URL}/api/servizi`),
+      ]);
       if (!meRes.ok) { setLoading(false); router.replace("/"); return; }
       const meData = await meRes.json();
       // ROUTE GUARD: il ruolo arriva dal backend (profili.ruolo), non da dati salvati nel browser.
@@ -463,37 +468,35 @@ export default function AdminDashboard() {
       setToken(session.access_token);
       setUtente(u);
       setEditNome(u.nome || "");
-      const resSedi = await fetch(`${BACKEND_URL}/api/sedi`);
-      const tutteSedi = await resSedi.json();
+      const [tutteSedi, tuttiServizi] = await Promise.all([resSedi.json(), resServ.json()]);
       setSedi(tutteSedi);
       if (tutteSedi.length > 0) setSedeCorrente(tutteSedi[0].id);
       setFiltroBarbiere(null);
-      const resServ = await fetch(`${BACKEND_URL}/api/servizi`);
-      setServizi(await resServ.json());
+      setServizi(tuttiServizi);
       setLoading(false);
     } catch (err) {
       setLoading(false);
       router.replace("/");
     }
   };
+  // Barbieri e prenotazioni partono insieme. Il filtro per barbiere ("La mia agenda" /
+  // "Agenda globale") è solo lato client: cambiarlo non deve rifare le richieste.
   useEffect(() => {
     if (sedeCorrente && token) {
       caricaBarbieri();
       caricaPrenotazioni();
     }
-  }, [sedeCorrente, dataCorrente, filtroBarbiere]);
+  }, [sedeCorrente, dataCorrente]);
   const caricaBarbieri = async () => {
     try {
-      const res = await fetch(
-        `${BACKEND_URL}/api/barbieri-disponibili?sede_id=${sedeCorrente}&data=${dataCorrente}`,
-      );
-      const data = await res.json();
+      // Barbieri in turno e barbieri della sede (con assenze) in PARALLELO
+      const [res, resAll] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/barbieri-disponibili?sede_id=${sedeCorrente}&data=${dataCorrente}`),
+        fetchAuth(`${BACKEND_URL}/api/admin/barbieri?sede_id=${sedeCorrente}`),
+      ]);
+      const [data, allBarb] = await Promise.all([res.json(), resAll.json()]);
       const lista = Array.isArray(data) ? data : data.barbieri || [];
       setBarbieri(lista);
-      const resAll = await fetchAuth(
-        `${BACKEND_URL}/api/admin/barbieri?sede_id=${sedeCorrente}`,
-      );
-      const allBarb = await resAll.json();
       // Ogni barbiere include le sue assenze/permessi (b.assenze): banner e overlay ne derivano
       if (Array.isArray(allBarb)) setTuttiBarbieri(allBarb);
     } catch (err) {

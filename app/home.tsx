@@ -222,10 +222,13 @@ export default function Home() {
   useFocusEffect(
     useCallback(() => {
       const ricarica = async () => {
-        const visti = await AsyncStorage.getItem("appuntamenti_visti");
-        await contaAppuntamenti();
+        // Appuntamenti e notifiche in PARALLELO (prima le notifiche partivano solo dopo gli appuntamenti)
+        const [visti] = await Promise.all([
+          AsyncStorage.getItem("appuntamenti_visti"),
+          contaAppuntamenti(),
+          contaNotifiche(),
+        ]);
         if (visti) setNumAppuntamenti(0);
-        contaNotifiche();
         startCardAnimations(); // avvia animazioni ora che i dati sono pronti (no-op se già avviate)
       };
       ricarica();
