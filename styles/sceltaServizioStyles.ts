@@ -60,9 +60,14 @@ export const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "700",
     textAlign: "center",
-    marginBottom: 6,
   },
-  featuredDuration: { color: "#555", fontSize: 12, textAlign: "center", marginBottom: 12 },
+  // Stessa linea sottile che nelle card a lista separa le informazioni dal prezzo
+  featuredDivider: {
+    alignSelf: "stretch",
+    height: 1,
+    backgroundColor: "#1E1E1E",
+    marginVertical: 14,
+  },
   featuredPriceRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "center" },
   featuredPriceSymbol: {
     color: "#D4AF37",
@@ -95,11 +100,9 @@ export const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 18,
     fontWeight: "700",
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  serviceDesc: { color: "#555", fontSize: 12, marginBottom: 6, lineHeight: 16 },
-  serviceMeta: { flexDirection: "row", alignItems: "center" },
-  serviceDuration: { color: "#444", fontSize: 12 },
+  serviceDesc: { color: "#555", fontSize: 12, lineHeight: 16 },
   // Prezzo separato dal testo da una linea sottile, centrato in verticale nella card
   servicePriceContainer: {
     flexDirection: "row",

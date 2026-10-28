@@ -22,7 +22,6 @@ export const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     gap: 16,
-    marginBottom: 10,
   },
   cardPriceContainer: { flexDirection: "row", alignItems: "flex-start" },
   cardPriceSymbol: {
@@ -38,14 +37,6 @@ export const styles = StyleSheet.create({
     color: "#555",
     fontSize: 14,
     lineHeight: 20,
-    marginBottom: 14,
+    marginTop: 6,
   },
-  cardFooter: { flexDirection: "row" },
-  durationChip: {
-    backgroundColor: "rgba(255,255,255,0.05)",
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-  },
-  durationText: { color: "#666", fontSize: 13 },
 });

@@ -528,7 +528,7 @@ export default function Home() {
           >
             <View style={s.mainInner}>
               <View style={s.mainIcon}>
-                <Text style={{ fontSize: 26 }}>📅</Text>
+                <Ionicons name="calendar-outline" size={26} color={ORO} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={s.mainTitle}>Nuova Prenotazione</Text>

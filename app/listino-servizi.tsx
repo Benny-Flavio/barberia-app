@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 
+import DurataServizio from "../components/DurataServizio";
 import { compatto } from "../lib/compatto";
 import { styles } from "../styles/listinoServiziStyles";
 
@@ -109,11 +110,7 @@ function ServiceCard({ item, index }: { item: any; index: number }) {
       {item.descrizione && (
         <Text style={styles.cardDescrizione}>{item.descrizione}</Text>
       )}
-      <View style={styles.cardFooter}>
-        <View style={styles.durationChip}>
-          <Text style={styles.durationText}>⏳ {item.durata_minuti} min</Text>
-        </View>
-      </View>
+      <DurataServizio minuti={item.durata_minuti} />
     </Animated.View>
   );
 }

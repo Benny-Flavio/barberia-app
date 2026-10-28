@@ -1,7 +1,7 @@
 import { StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0A0A0A" },
+  container: { flex: 1, backgroundColor: "#0A0A0A", overflow: "hidden" },
   header: { marginTop: 20, marginBottom: 24 },
   stepLabel: {
     color: "#D4AF37",
@@ -66,41 +66,58 @@ export const styles = StyleSheet.create({
   btnConfermaPremuto: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   btnDisabilitato: { opacity: 0.6 },
   btnConfermaText: { color: "#0A0A0A", fontSize: 17, fontWeight: "800", letterSpacing: 0.5 },
-  btnIndietro: {
+  // Modifica + Home affiancati sotto la conferma
+  rigaBottoni: { flexDirection: "row", gap: 12 },
+  btnSecondario: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
     backgroundColor: "#0A0A0A",
-    paddingVertical: 17,
+    paddingVertical: 15,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#D4AF37",
-    alignItems: "center",
     cursor: "pointer" as any,
   },
-  btnIndietroPremuto: { backgroundColor: "#141208" },
-  btnIndietroText: { color: "#D4AF37", fontSize: 16, fontWeight: "700" },
+  btnSecondarioPremuto: { backgroundColor: "#141208" },
+  btnSecondarioText: { color: "#D4AF37", fontSize: 15, fontWeight: "700" },
 
-  // Schermata di successo
-  successo: { alignItems: "center", paddingTop: 40 },
+  // Schermata di successo: occupa esattamente l'altezza dello schermo, niente scroll
+  successo: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    overflow: "hidden",
+  },
   successoCerchio: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     borderWidth: 2,
     borderColor: "#D4AF37",
     backgroundColor: "rgba(212,175,55,0.08)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 24,
+    marginBottom: 18,
   },
-  successoTitolo: { color: "#FFF", fontSize: 26, fontWeight: "900", textAlign: "center" },
+  successoTitolo: { color: "#FFF", fontSize: 22, fontWeight: "900", textAlign: "center" },
   successoTesto: {
     color: "#888",
-    fontSize: 15,
+    fontSize: 14,
     textAlign: "center",
-    lineHeight: 22,
-    marginTop: 10,
-    marginBottom: 28,
+    lineHeight: 20,
+    marginTop: 8,
+    marginBottom: 20,
   },
   successoCard: { alignSelf: "stretch" },
+  successoBtn: { alignSelf: "stretch", marginTop: 20 },
+  cardHeroEssenziale: { paddingVertical: 16 },
+  heroOraEssenziale: { fontSize: 36 },
+  rigaEssenziale: { paddingVertical: 11 },
 
   // Parametri mancanti (pagina aperta senza passare dal flusso)
   vuoto: { alignItems: "center", paddingTop: 60 },

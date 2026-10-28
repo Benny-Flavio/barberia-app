@@ -128,35 +128,37 @@ export default function RiepilogoPrenotazione() {
     }
   };
 
-  // Chiude gli step della prenotazione e riapre la home (anche se la pagina è stata aperta da link)
+  // Chiude gli step della prenotazione e riapre la home (anche se la pagina è stata aperta da link).
+  // Usato sia dopo la conferma sia dal bottone "Home", che annulla la procedura
   const tornaAllaHome = () => {
     if (router.canDismiss()) router.dismissAll();
     router.replace("/home");
   };
 
-  const righe = completo && (
+  // essenziale: versione compatta per la schermata di successo, che non scorre
+  const righe = (essenziale = false) => completo && (
     <View style={styles.card}>
-      <View style={styles.cardHero}>
+      <View style={[styles.cardHero, essenziale && styles.cardHeroEssenziale]}>
         <Text style={styles.heroData}>{dataLeggibile(p.data)}</Text>
-        <Text style={styles.heroOra}>{p.ora}</Text>
+        <Text style={[styles.heroOra, essenziale && styles.heroOraEssenziale]}>{p.ora}</Text>
         <Text style={styles.heroServizio}>{p.servizio_nome}</Text>
       </View>
       <View style={styles.righe}>
-        <View style={styles.riga}>
+        <View style={[styles.riga, essenziale && styles.rigaEssenziale]}>
           <Text style={styles.rigaLabel}>Barbiere</Text>
           <Text style={styles.rigaValore}>{p.barbiere_nome}</Text>
         </View>
-        <View style={styles.riga}>
+        <View style={[styles.riga, essenziale && styles.rigaEssenziale, essenziale && styles.rigaUltima]}>
           <Text style={styles.rigaLabel}>Sede</Text>
           <Text style={styles.rigaValore}>{p.nome_sede}</Text>
         </View>
-        {servizio?.durata_minuti ? (
+        {!essenziale && servizio?.durata_minuti ? (
           <View style={styles.riga}>
             <Text style={styles.rigaLabel}>Durata</Text>
             <Text style={styles.rigaValore}>{servizio.durata_minuti} min</Text>
           </View>
         ) : null}
-        {servizio?.prezzo != null ? (
+        {!essenziale && servizio?.prezzo != null ? (
           <View style={[styles.riga, styles.rigaUltima]}>
             <Text style={styles.rigaLabel}>Prezzo</Text>
             <Text style={styles.rigaPrezzo}>€ {Number(servizio.prezzo).toFixed(0)}</Text>
@@ -174,6 +176,30 @@ export default function RiepilogoPrenotazione() {
     );
   }
 
+  // Schermata di successo: layout fisso al 100% dell'altezza, senza scroll
+  if (completo && confermato) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Animated.View style={[styles.successo, { opacity: successoOp }]}>
+          <Animated.View style={[styles.successoCerchio, { transform: [{ scale: successoScala }] }]}>
+            <Ionicons name="checkmark" size={40} color="#D4AF37" />
+          </Animated.View>
+          <Text style={styles.successoTitolo}>Appuntamento Confermato!</Text>
+          <Text style={styles.successoTesto}>
+            Ti aspettiamo a {p.nome_sede}.{"\n"}Lo trovi nella sezione Appuntamenti.
+          </Text>
+          <View style={styles.successoCard}>{righe(true)}</View>
+          <Pressable
+            style={({ pressed }) => [styles.btnConferma, styles.successoBtn, pressed && styles.btnConfermaPremuto]}
+            onPress={tornaAllaHome}
+          >
+            <Text style={styles.btnConfermaText}>Torna alla Home</Text>
+          </Pressable>
+        </Animated.View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
@@ -184,25 +210,6 @@ export default function RiepilogoPrenotazione() {
               <Text style={styles.btnConfermaText}>Nuova Prenotazione</Text>
             </Pressable>
           </View>
-        ) : confermato ? (
-          <Animated.View style={[styles.successo, { opacity: successoOp }]}>
-            <Animated.View style={[styles.successoCerchio, { transform: [{ scale: successoScala }] }]}>
-              <Ionicons name="checkmark" size={52} color="#D4AF37" />
-            </Animated.View>
-            <Text style={styles.successoTitolo}>Appuntamento Confermato!</Text>
-            <Text style={styles.successoTesto}>
-              Ti aspettiamo a {p.nome_sede}.{"\n"}Trovi l'appuntamento nella sezione Appuntamenti.
-            </Text>
-            <View style={styles.successoCard}>{righe}</View>
-            <View style={[styles.bottoni, { alignSelf: "stretch" }]}>
-              <Pressable
-                style={({ pressed }) => [styles.btnConferma, pressed && styles.btnConfermaPremuto]}
-                onPress={tornaAllaHome}
-              >
-                <Text style={styles.btnConfermaText}>Torna alla Home</Text>
-              </Pressable>
-            </View>
-          </Animated.View>
         ) : (
           <Animated.View style={{ opacity: contenutoOp }}>
             <View {...compatto("header")} style={styles.header}>
@@ -211,7 +218,7 @@ export default function RiepilogoPrenotazione() {
               <Text style={styles.subtitle}>Controlla i dettagli e conferma</Text>
             </View>
 
-            {righe}
+            {righe()}
 
             {errore ? <Text style={styles.errore}>{errore}</Text> : null}
 
@@ -231,13 +238,25 @@ export default function RiepilogoPrenotazione() {
                   <Text style={styles.btnConfermaText}>Conferma Appuntamento</Text>
                 )}
               </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.btnIndietro, pressed && styles.btnIndietroPremuto]}
-                onPress={modifica}
-                disabled={invioInCorso}
-              >
-                <Text style={styles.btnIndietroText}>← Indietro / Modifica</Text>
-              </Pressable>
+              {/* Azioni secondarie affiancate: Modifica torna agli step, Home annulla la procedura */}
+              <View style={styles.rigaBottoni}>
+                <Pressable
+                  style={({ pressed }) => [styles.btnSecondario, pressed && styles.btnSecondarioPremuto]}
+                  onPress={modifica}
+                  disabled={invioInCorso}
+                >
+                  <Ionicons name="create-outline" size={18} color="#D4AF37" />
+                  <Text style={styles.btnSecondarioText}>Modifica</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.btnSecondario, pressed && styles.btnSecondarioPremuto]}
+                  onPress={tornaAllaHome}
+                  disabled={invioInCorso}
+                >
+                  <Ionicons name="home-outline" size={18} color="#D4AF37" />
+                  <Text style={styles.btnSecondarioText}>Home</Text>
+                </Pressable>
+              </View>
             </View>
           </Animated.View>
         )}

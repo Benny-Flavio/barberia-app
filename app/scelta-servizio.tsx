@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 
+import DurataServizio from "../components/DurataServizio";
 import { compatto } from "../lib/compatto";
 import { styles } from "../styles/sceltaServizioStyles";
 
@@ -191,7 +192,8 @@ function AnimatedCard({
           onPress={() => onPress(item)}
         >
           <Text style={styles.featuredName}>{item.nome}</Text>
-          <Text style={styles.featuredDuration}>⏳ {item.durata_minuti} min</Text>
+          <DurataServizio minuti={item.durata_minuti} style={{ alignSelf: "center" }} />
+          <View style={styles.featuredDivider} />
           <View style={styles.featuredPriceRow}>
             <Text style={styles.featuredPriceSymbol}>€</Text>
             <Text style={styles.featuredPrice}>
@@ -217,11 +219,7 @@ function AnimatedCard({
           {item.descrizione && (
             <Text style={styles.serviceDesc}>{item.descrizione}</Text>
           )}
-          <View style={styles.serviceMeta}>
-            <Text style={styles.serviceDuration}>
-              ⏳ {item.durata_minuti} min
-            </Text>
-          </View>
+          <DurataServizio minuti={item.durata_minuti} />
         </View>
         <View style={styles.servicePriceContainer}>
           <Text style={styles.servicePriceSymbol}>€</Text>
