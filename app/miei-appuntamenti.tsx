@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 
+import { compatto } from "../lib/compatto";
 import { st } from "../styles/mieiAppuntamentiStyles";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
@@ -105,8 +106,8 @@ export default function MieiAppuntamenti() {
   return (
     <SafeAreaView style={st.container}>
       <View style={{ flex: 1, padding: 24 }}>
-      <Animated.View style={[st.header, { opacity: headerOp }]}>
-        <Pressable onPress={() => router.back()} style={st.backBtn}>
+      <Animated.View {...compatto("header")} style={[st.header, { opacity: headerOp }]}>
+        <Pressable onPress={() => router.back()} style={st.backBtn} {...compatto("indietro")}>
           <Text style={st.backText}>← Indietro</Text>
         </Pressable>
         <Text style={st.title}>I Miei Appuntamenti</Text>

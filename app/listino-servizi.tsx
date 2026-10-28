@@ -10,23 +10,10 @@ import {
   View,
 } from "react-native";
 
+import { compatto } from "../lib/compatto";
 import { styles } from "../styles/listinoServiziStyles";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
-
-const getIcona = (nome: string) => {
-  const n = nome.toLowerCase();
-  if (n.includes("bimbo") || n.includes("under")) return "👦";
-  if (n.includes("taglio") && n.includes("modellatura")) return "💇‍♂️";
-  if (n.includes("taglio") && n.includes("rifinitura")) return "✂️";
-  if (n.includes("taglio")) return "💈";
-  if (n.includes("modellatura") && n.includes("rasatura")) return "🧖‍♂️";
-  if (n.includes("modellatura")) return "🪒";
-  if (n.includes("rasatura")) return "🧔";
-  if (n.includes("rifinitura")) return "✨";
-  if (n.includes("trattamento")) return "💆‍♂️";
-  return "💈";
-};
 
 export default function ListinoServizi() {
   const { sede_id, nome_sede } = useLocalSearchParams();
@@ -56,8 +43,8 @@ export default function ListinoServizi() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
-        <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Animated.View {...compatto("header")} style={[styles.header, { opacity: headerOpacity }]}>
+          <Pressable onPress={() => router.back()} style={styles.backButton} {...compatto("indietro")}>
             <Text style={styles.backButtonText}>← Indietro</Text>
           </Pressable>
           <Text style={styles.title}>I Nostri Servizi</Text>
@@ -113,15 +100,12 @@ function ServiceCard({ item, index }: { item: any; index: number }) {
       style={[styles.card, { opacity, transform: [{ translateY: translate }] }]}
     >
       <View style={styles.cardTop}>
-        <View style={styles.cardIconContainer}>
-          <Text style={styles.cardIcon}>{getIcona(item.nome)}</Text>
-        </View>
+        <Text style={styles.cardNome}>{item.nome}</Text>
         <View style={styles.cardPriceContainer}>
           <Text style={styles.cardPriceSymbol}>€</Text>
           <Text style={styles.cardPrice}>{Number(item.prezzo).toFixed(0)}</Text>
         </View>
       </View>
-      <Text style={styles.cardNome}>{item.nome}</Text>
       {item.descrizione && (
         <Text style={styles.cardDescrizione}>{item.descrizione}</Text>
       )}

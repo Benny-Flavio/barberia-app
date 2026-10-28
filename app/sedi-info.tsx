@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 
+import { compatto } from "../lib/compatto";
 import { st } from "../styles/sediInfoStyles";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
@@ -68,8 +69,8 @@ export default function SediInfo() {
   return (
     <SafeAreaView style={st.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
-        <Animated.View style={[st.header, { opacity: headerOp }]}>
-          <Pressable onPress={() => router.back()} style={st.backBtn}>
+        <Animated.View {...compatto("header")} style={[st.header, { opacity: headerOp }]}>
+          <Pressable onPress={() => router.back()} style={st.backBtn} {...compatto("indietro")}>
             <Text style={st.backText}>← Indietro</Text>
           </Pressable>
           <Text style={st.title}>Le Nostre Sedi</Text>

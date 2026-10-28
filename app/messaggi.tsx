@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 
+import { compatto } from "../lib/compatto";
 import { s } from "../styles/messaggiStyles";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
@@ -76,8 +77,8 @@ export default function Messaggi() {
   return (
     <SafeAreaView style={s.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
-        <Animated.View style={[s.header, { opacity: headerOp }]}>
-          <Pressable onPress={() => router.back()} style={s.backBtn}>
+        <Animated.View {...compatto("header")} style={[s.header, { opacity: headerOp }]}>
+          <Pressable onPress={() => router.back()} style={s.backBtn} {...compatto("indietro")}>
             <Text style={s.backText}>← Indietro</Text>
           </Pressable>
           <Text style={s.title}>Messaggi</Text>

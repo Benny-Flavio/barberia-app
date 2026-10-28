@@ -10,23 +10,10 @@ import {
   View,
 } from "react-native";
 
+import { compatto } from "../lib/compatto";
 import { styles } from "../styles/sceltaServizioStyles";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
-
-const getIcona = (nome: string) => {
-  const n = nome.toLowerCase();
-  if (n.includes("bimbo") || n.includes("under")) return "👦";
-  if (n.includes("taglio") && n.includes("modellatura")) return "💇‍♂️";
-  if (n.includes("taglio") && n.includes("rifinitura")) return "✂️";
-  if (n.includes("taglio")) return "💈";
-  if (n.includes("modellatura") && n.includes("rasatura")) return "🧖‍♂️";
-  if (n.includes("modellatura")) return "🪒";
-  if (n.includes("rasatura")) return "🧔";
-  if (n.includes("rifinitura")) return "✨";
-  if (n.includes("trattamento")) return "💆‍♂️";
-  return "💈";
-};
 
 export default function SceltaServizio() {
   const { sede_id, nome_sede } = useLocalSearchParams();
@@ -86,7 +73,7 @@ export default function SceltaServizio() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} bounces={false} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
-        <Animated.View
+        <Animated.View {...compatto("header")}
           style={[
             styles.header,
             {
@@ -95,7 +82,7 @@ export default function SceltaServizio() {
             },
           ]}
         >
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={() => router.back()} style={styles.backButton} {...compatto("indietro")}>
             <Text style={styles.backButtonText}>← Indietro</Text>
           </Pressable>
           <Text style={styles.title}>Cosa facciamo oggi?</Text>
@@ -203,9 +190,6 @@ function AnimatedCard({
           ]}
           onPress={() => onPress(item)}
         >
-          <View style={styles.featuredIconContainer}>
-            <Text style={styles.featuredIcon}>{getIcona(item.nome)}</Text>
-          </View>
           <Text style={styles.featuredName}>{item.nome}</Text>
           <Text style={styles.featuredDuration}>⏳ {item.durata_minuti} min</Text>
           <View style={styles.featuredPriceRow}>
@@ -228,9 +212,6 @@ function AnimatedCard({
         ]}
         onPress={() => onPress(item)}
       >
-        <View style={styles.serviceIconContainer}>
-          <Text style={styles.serviceIcon}>{getIcona(item.nome)}</Text>
-        </View>
         <View style={styles.serviceInfo}>
           <Text style={styles.serviceName}>{item.nome}</Text>
           {item.descrizione && (

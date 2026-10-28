@@ -1,7 +1,5 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router, useLocalSearchParams } from "expo-router";
-import { supabase } from "../lib/supabase";
-import React, { useEffect, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -13,6 +11,7 @@ import {
 } from "react-native";
 import { Calendar, LocaleConfig } from "react-native-calendars";
 
+import { compatto } from "../lib/compatto";
 import { styles } from "../styles/sceltaDataStyles";
 
 LocaleConfig.locales["it"] = {
@@ -61,7 +60,9 @@ LocaleConfig.defaultLocale = "it";
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
 
 export default function SceltaData() {
-  const { sede_id, nome_sede, servizio_id, servizio_nome } =
+  // data / barbiere_id / ora arrivano solo tornando dal riepilogo dopo un refresh della pagina
+  // (senza cronologia): servono a ripristinare le scelte già fatte
+  const { sede_id, nome_sede, servizio_id, servizio_nome, data, barbiere_id, ora } =
     useLocalSearchParams();
 
   const [barbieri, setBarbieri] = useState<any[]>([]);
@@ -71,14 +72,12 @@ export default function SceltaData() {
   const [orariDisponibili, setOrariDisponibili] = useState<string[]>([]);
   const [loadingOrari, setLoadingOrari] = useState(false);
   const [loadingBarbieri, setLoadingBarbieri] = useState(false);
-  const [invioInCorso, setInvioInCorso] = useState(false);
-  const [errore, setErrore] = useState("");
   const [barbieriMsg, setBarbieriMsg] = useState("");
 
   const headerOpacity = useRef(new Animated.Value(0)).current;
   const step2Opacity = useRef(new Animated.Value(0)).current;
   const step3Opacity = useRef(new Animated.Value(0)).current;
-  const riepilogoOpacity = useRef(new Animated.Value(0)).current;
+  const daRipristinare = useRef<{ barbiere_id?: string; ora?: string } | null>(null);
 
   const oggi = new Date();
   const dataOggiString = oggi.toISOString().split("T")[0];
@@ -92,6 +91,11 @@ export default function SceltaData() {
       duration: 500,
       useNativeDriver: true,
     }).start();
+    // Ripristino dopo il mount (non nello stato iniziale: la pagina è pre-renderizzata senza parametri)
+    if (typeof data === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data)) {
+      daRipristinare.current = { barbiere_id: barbiere_id as string, ora: ora as string };
+      setDataSelezionata(data);
+    }
   }, []);
 
   useEffect(() => {
@@ -101,7 +105,6 @@ export default function SceltaData() {
     setOraSelezionata("");
     setOrariDisponibili([]);
     setBarbieriMsg("");
-    setErrore("");
 
     fetch(
       `${BACKEND_URL}/api/barbieri-disponibili?sede_id=${sede_id}&data=${dataSelezionata}`,
@@ -113,6 +116,10 @@ export default function SceltaData() {
           setBarbieriMsg(data.messaggio);
         } else {
           setBarbieri(data);
+          const daRipr = daRipristinare.current?.barbiere_id;
+          const barbiere = daRipr && data.find((b: any) => String(b.id) === daRipr && !b.disabilitato);
+          if (barbiere) setBarbiereSelezionato(barbiere);
+          else daRipristinare.current = null;
           Animated.timing(step2Opacity, {
             toValue: 1,
             duration: 400,
@@ -158,6 +165,9 @@ export default function SceltaData() {
       .then((res) => res.json())
       .then((data) => {
         setOrariDisponibili(data);
+        const daRipr = daRipristinare.current?.ora;
+        if (daRipr && Array.isArray(data) && data.includes(daRipr)) setOraSelezionata(daRipr);
+        daRipristinare.current = null;
         Animated.timing(step3Opacity, {
           toValue: 1,
           duration: 400,
@@ -171,60 +181,45 @@ export default function SceltaData() {
       });
   }, [barbiereSelezionato, dataSelezionata]);
 
-  useEffect(() => {
-    if (oraSelezionata) {
-      Animated.timing(riepilogoOpacity, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [oraSelezionata]);
+  // Tornando dal riepilogo gli orari si riaggiornano (uno potrebbe essere stato appena preso),
+  // senza perdere le scelte: l'orario resta selezionato se è ancora libero
+  const sceltaCorrente = useRef({ barbiereSelezionato, dataSelezionata, federicoSoloChiamata });
+  sceltaCorrente.current = { barbiereSelezionato, dataSelezionata, federicoSoloChiamata };
+  const primoFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (primoFocus.current) { primoFocus.current = false; return; }
+      const { barbiereSelezionato: b, dataSelezionata: d, federicoSoloChiamata: soloChiamata } = sceltaCorrente.current;
+      if (!b || !d || soloChiamata) return;
+      fetch(`${BACKEND_URL}/api/orari-disponibili?barbiere_id=${b.id}&data=${d}&servizio_id=${servizio_id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!Array.isArray(data)) return;
+          setOrariDisponibili(data);
+          setOraSelezionata((prec) => (data.includes(prec) ? prec : ""));
+        })
+        .catch(() => {});
+    }, []),
+  );
 
-  const confermaPrenotazione = async () => {
-    if (!dataSelezionata || !oraSelezionata || !barbiereSelezionato) {
-      setErrore("Scegli una data, un barbiere e un orario.");
-      return;
-    }
-    setInvioInCorso(true);
-    try {
-      let { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace("/"); return; }
-      // Forza refresh del token se prossimo alla scadenza o già scaduto
-      if (!session.expires_at || session.expires_at * 1000 < Date.now() + 60000) {
-        const refreshed = await supabase.auth.refreshSession();
-        if (refreshed.data.session) session = refreshed.data.session;
-      }
-      const token = session.access_token;
-      const response = await fetch(`${BACKEND_URL}/api/prenotazioni`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          sede_id: Number(sede_id),
-          barbiere_id: barbiereSelezionato.id,
-          data: dataSelezionata,
-          ora: oraSelezionata,
-          servizio_id: Number(servizio_id),
-        }),
-      });
-      const result = await response.json();
-      if (result.success) {
-        await AsyncStorage.removeItem("appuntamenti_visti");
-        router.push({
-          pathname: "/home",
-          params: { sede_id: String(sede_id), nome_sede: String(nome_sede) },
-        });
-      } else {
-        setErrore(result.error || "Impossibile salvare.");
-      }
-    } catch (error) {
-      setErrore("Impossibile collegarsi al server.");
-    } finally {
-      setInvioInCorso(false);
-    }
+  // Ultimo step: scelto l'orario si passa al riepilogo. Questa pagina resta nello stack con le
+  // scelte fatte, quindi "Indietro / Modifica" ci torna con tutto ancora selezionato
+  const vaiAlRiepilogo = (ora: string) => {
+    if (!dataSelezionata || !barbiereSelezionato) return;
+    setOraSelezionata(ora);
+    router.push({
+      pathname: "/riepilogo-prenotazione" as any,
+      params: {
+        sede_id: String(sede_id),
+        nome_sede: String(nome_sede),
+        servizio_id: String(servizio_id),
+        servizio_nome: String(servizio_nome),
+        barbiere_id: String(barbiereSelezionato.id),
+        barbiere_nome: String(barbiereSelezionato.nome),
+        data: dataSelezionata,
+        ora,
+      },
+    });
   };
 
   const getMarkedDates = () => {
@@ -253,8 +248,8 @@ export default function SceltaData() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: 40 }}>
-        <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Animated.View {...compatto("header")} style={[styles.header, { opacity: headerOpacity }]}>
+          <Pressable onPress={() => router.back()} style={styles.backButton} {...compatto("indietro")}>
             <Text style={styles.backButtonText}>← Indietro</Text>
           </Pressable>
           <Text style={styles.title}>Prenota Appuntamento</Text>
@@ -423,7 +418,7 @@ export default function SceltaData() {
                       styles.timeBtn,
                       oraSelezionata === ora && styles.timeBtnSelected,
                     ]}
-                    onPress={() => setOraSelezionata(ora)}
+                    onPress={() => vaiAlRiepilogo(ora)}
                   >
                     <Text
                       style={[
@@ -437,52 +432,6 @@ export default function SceltaData() {
                 ))}
               </View>
             )}
-          </Animated.View>
-        ) : null}
-
-        {oraSelezionata ? (
-          <Animated.View
-            style={[styles.riepilogo, { opacity: riepilogoOpacity }]}
-          >
-            <Text style={styles.riepilogoTitle}>Riepilogo</Text>
-            <View style={styles.riepilogoRow}>
-              <Text style={styles.riepilogoLabel}>Sede</Text>
-              <Text style={styles.riepilogoValue}>{nome_sede}</Text>
-            </View>
-            <View style={styles.riepilogoRow}>
-              <Text style={styles.riepilogoLabel}>Servizio</Text>
-              <Text style={styles.riepilogoValue}>{servizio_nome}</Text>
-            </View>
-            <View style={styles.riepilogoRow}>
-              <Text style={styles.riepilogoLabel}>Barbiere</Text>
-              <Text style={styles.riepilogoValue}>
-                {barbiereSelezionato?.nome}
-              </Text>
-            </View>
-            <View style={styles.riepilogoRow}>
-              <Text style={styles.riepilogoLabel}>Data</Text>
-              <Text style={styles.riepilogoValue}>{dataSelezionata}</Text>
-            </View>
-            <View style={styles.riepilogoRow}>
-              <Text style={styles.riepilogoLabel}>Ora</Text>
-              <Text style={styles.riepilogoValue}>{oraSelezionata}</Text>
-            </View>
-
-            {errore ? (
-              <Text style={{ color: "#F44336", fontSize: 13, textAlign: "center", marginBottom: 8 }}>{errore}</Text>
-            ) : null}
-            <Pressable
-              style={[
-                styles.confirmBtn,
-                invioInCorso && styles.confirmBtnDisabled,
-              ]}
-              onPress={confermaPrenotazione}
-              disabled={invioInCorso}
-            >
-              <Text style={styles.confirmBtnText}>
-                {invioInCorso ? "Invio..." : "Conferma Appuntamento"}
-              </Text>
-            </Pressable>
           </Animated.View>
         ) : null}
 

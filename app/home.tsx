@@ -18,6 +18,17 @@ import {
 // IMPORTIAMO GLI STILI SEPARATI E LA COSTANTE SHEET_H
 import { s, SHEET_H } from "../styles/homeStyles";
 import GuidaInstallazione from "../components/GuidaInstallazione";
+import { compatto } from "../lib/compatto";
+import { Ionicons } from "@expo/vector-icons";
+
+const ORO = "#D4AF37";
+
+// Icona vettoriale oro su fondo scuro per le card della sezione "Esplora"
+const IconaEsplora = ({ nome }: { nome: React.ComponentProps<typeof Ionicons>["name"] }) => (
+  <View style={s.gridIconBox}>
+    <Ionicons name={nome} size={22} color={ORO} />
+  </View>
+);
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
 
@@ -358,7 +369,7 @@ export default function Home() {
         contentContainerStyle={s.scroll}
         bounces={false}
       >
-        <Animated.View style={[s.header, { opacity: headerOp }]}>
+        <Animated.View {...compatto("home")} style={[s.header, { opacity: headerOp }]}>
           <View>
             <View style={s.logoRow}>
               <View style={s.logo}>
@@ -537,7 +548,7 @@ export default function Home() {
             onPress={() => router.push("/miei-appuntamenti" as any)}
           >
             <View style={s.iconRow}>
-              <Text style={s.gridIcon}>🕒</Text>
+              <IconaEsplora nome="time-outline" />
               {numAppuntamenti > 0 && (
                 <View style={s.badge}>
                   <Text style={s.badgeText}>{numAppuntamenti}</Text>
@@ -552,7 +563,9 @@ export default function Home() {
             style={({ pressed }) => [s.gridCard, pressed && s.gridCardPressed]}
             onPress={() => router.push("/listino-servizi" as any)}
           >
-            <Text style={s.gridIcon}>✂️</Text>
+            <View style={s.iconRow}>
+              <IconaEsplora nome="cut-outline" />
+            </View>
             <Text style={s.gridTitle}>Servizi</Text>
             <Text style={s.gridSub}>Listino prezzi</Text>
           </Pressable>
@@ -561,7 +574,9 @@ export default function Home() {
             style={({ pressed }) => [s.gridCard, pressed && s.gridCardPressed]}
             onPress={() => router.push("/sedi-info" as any)}
           >
-            <Text style={s.gridIcon}>📍</Text>
+            <View style={s.iconRow}>
+              <IconaEsplora nome="location-outline" />
+            </View>
             <Text style={s.gridTitle}>Sedi</Text>
             <Text style={s.gridSub}>Info e barbieri</Text>
           </Pressable>
@@ -574,7 +589,7 @@ export default function Home() {
             onPress={() => router.push("/messaggi" as any)}
           >
             <View style={s.iconRow}>
-              <Text style={s.gridIcon}>💬</Text>
+              <IconaEsplora nome="chatbubble-ellipses-outline" />
               {nonLette > 0 && (
                 <View style={s.badge}>
                   <Text style={s.badgeText}>{nonLette}</Text>

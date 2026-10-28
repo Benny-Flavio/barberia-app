@@ -16,21 +16,14 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#1E1E1E",
   },
+  // Nome a sinistra e prezzo a destra sulla stessa riga, centrati in verticale
   cardTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 14,
+    gap: 16,
+    marginBottom: 10,
   },
-  cardIconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: "rgba(212, 175, 55, 0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cardIcon: { fontSize: 26 },
   cardPriceContainer: { flexDirection: "row", alignItems: "flex-start" },
   cardPriceSymbol: {
     color: "#D4AF37",
@@ -40,7 +33,7 @@ export const styles = StyleSheet.create({
     marginRight: 2,
   },
   cardPrice: { color: "#D4AF37", fontSize: 36, fontWeight: "800" },
-  cardNome: { color: "#FFF", fontSize: 20, fontWeight: "700", marginBottom: 6 },
+  cardNome: { flex: 1, color: "#FFF", fontSize: 20, fontWeight: "700" },
   cardDescrizione: {
     color: "#555",
     fontSize: 14,

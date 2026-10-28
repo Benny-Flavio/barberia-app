@@ -80,6 +80,7 @@ export default function RootLayout() {
           <Stack.Screen name="scelta-sede" />
           <Stack.Screen name="scelta-servizio" />
           <Stack.Screen name="scelta-data" />
+          <Stack.Screen name="riepilogo-prenotazione" />
           <Stack.Screen name="miei-appuntamenti" />
           <Stack.Screen name="listino-servizi" />
           <Stack.Screen name="sedi-info" />
