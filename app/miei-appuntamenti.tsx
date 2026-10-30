@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { supabase } from "../lib/supabase";
 import React, { useEffect, useRef, useState } from "react";
@@ -12,6 +13,7 @@ import {
   View,
 } from "react-native";
 
+import ConfermaModale from "../components/ConfermaModale";
 import { compatto } from "../lib/compatto";
 import { st } from "../styles/mieiAppuntamentiStyles";
 
@@ -68,39 +70,49 @@ export default function MieiAppuntamenti() {
     setLoading(false);
   };
 
-  const cancella = async (id: number) => {
+  // Cancellazione in due passi: "Cancella" apre il modale, "Sì, cancella" elimina davvero
+  const [daCancellare, setDaCancellare] = useState<number | null>(null);
+  const [cancellazioneInCorso, setCancellazioneInCorso] = useState(false);
+  const [erroreCancellazione, setErroreCancellazione] = useState("");
+
+  const chiudiModale = () => {
+    if (cancellazioneInCorso) return;
+    setDaCancellare(null);
+    setErroreCancellazione("");
+  };
+
+  const confermaCancellazione = async () => {
+    if (daCancellare == null) return;
+    setCancellazioneInCorso(true);
+    setErroreCancellazione("");
     try {
       const tkn = await getToken();
-      await fetch(`${BACKEND_URL}/api/prenotazioni/${id}`, {
+      const res = await fetch(`${BACKEND_URL}/api/prenotazioni/${daCancellare}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${tkn}` },
       });
+      // 404 = già cancellata: in entrambi i casi la lista va riallineata
+      if (!res.ok && res.status !== 404) {
+        const data = await res.json().catch(() => ({}));
+        setErroreCancellazione(data.error || "Impossibile cancellare. Riprova.");
+        return;
+      }
+      setPrenotazioni((prev) => prev.filter((p) => p.id !== daCancellare));
+      setDaCancellare(null);
       carica();
-    } catch (err) {}
+    } catch {
+      setErroreCancellazione("Impossibile collegarsi al server.");
+    } finally {
+      setCancellazioneInCorso(false);
+    }
   };
 
+  const GIORNI = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+  const MESI = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+  // "Mar 3 Novembre"
   const fmtData = (d: string) => {
     const dt = new Date(d);
-    const g = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
-    const m = [
-      "Gen",
-      "Feb",
-      "Mar",
-      "Apr",
-      "Mag",
-      "Giu",
-      "Lug",
-      "Ago",
-      "Set",
-      "Ott",
-      "Nov",
-      "Dic",
-    ];
-    return {
-      giorno: g[dt.getDay()],
-      numero: dt.getDate(),
-      mese: m[dt.getMonth()],
-    };
+    return `${GIORNI[dt.getDay()]} ${dt.getDate()} ${MESI[dt.getMonth()]}`;
   };
 
   return (
@@ -121,7 +133,9 @@ export default function MieiAppuntamenti() {
         />
       ) : prenotazioni.length === 0 ? (
         <View style={st.emptyBox}>
-          <Text style={{ fontSize: 50, marginBottom: 16 }}>📋</Text>
+          <View style={st.emptyIcon}>
+            <Ionicons name="calendar-clear-outline" size={30} color="#D4AF37" />
+          </View>
           <Text style={st.emptyTitle}>Nessun appuntamento</Text>
           <Text style={st.emptySub}>Prenota il tuo primo taglio!</Text>
           <Pressable
@@ -135,7 +149,7 @@ export default function MieiAppuntamenti() {
         <>
           {showBanner && (
             <View style={st.confirmBanner}>
-              <Text style={{ fontSize: 18 }}>✅</Text>
+              <Ionicons name="checkmark-circle-outline" size={20} color="#4CAF50" />
               <Text style={st.confirmText}>
                 {(() => {
                   const n = prenotazioni.filter(p => p.stato === "attivo").length;
@@ -150,38 +164,60 @@ export default function MieiAppuntamenti() {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 40 }}
             renderItem={({ item }) => {
-              const d = fmtData(item.data);
               const isCancellato = item.stato === "cancellato";
+              const barrato = isCancellato && st.testoBarrato;
               return (
-                <View style={[st.card, isCancellato && { borderColor: "#2A0A0A", backgroundColor: "#0F0909" }]}>
+                <View style={[st.card, isCancellato && st.cardCancellata]}>
                   <View style={st.cardRow}>
-                    <View style={[st.dateBox, isCancellato && { backgroundColor: "rgba(244,67,54,0.06)" }]}>
-                      <Text style={[st.dateDay, isCancellato && { color: "#555" }]}>{d.giorno}</Text>
-                      <Text style={[st.dateNum, isCancellato && { color: "#555", textDecorationLine: "line-through" }]}>{d.numero}</Text>
-                      <Text style={[st.dateMon, isCancellato && { color: "#444" }]}>{d.mese}</Text>
+                    {/* Informazioni: servizio e data/ora in evidenza, poi barbiere e sede allineati */}
+                    <View style={st.cardInfo}>
+                      <Text style={[st.cardServ, barrato]}>{item.servizio_nome}</Text>
+                      <View style={st.dataOra}>
+                        <Ionicons name="calendar-outline" size={15} color={isCancellato ? "#555" : "#D4AF37"} />
+                        <Text style={[st.dataOraText, barrato]}>
+                          {fmtData(item.data)} · {item.ora?.slice(0, 5)}
+                        </Text>
+                      </View>
+                      <View style={st.dettaglio}>
+                        <Ionicons name="person-outline" size={14} color="#777" />
+                        <Text style={st.dettaglioLabel}>Barbiere</Text>
+                        <Text style={st.dettaglioValore}>{item.barbiere_nome}</Text>
+                      </View>
+                      <View style={st.dettaglio}>
+                        <Ionicons name="location-outline" size={14} color="#777" />
+                        <Text style={st.dettaglioLabel}>Sede</Text>
+                        <Text style={st.dettaglioValore}>{item.sede_nome}</Text>
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[st.cardServ, isCancellato && { color: "#555", textDecorationLine: "line-through" }]}>{item.servizio_nome}</Text>
-                      <Text style={[st.cardDet, isCancellato && { color: "#444" }]}>
-                        🕐 {item.ora?.slice(0, 5)} 💈 {item.barbiere_nome}
-                      </Text>
-                      <Text style={[st.sedeTag, isCancellato && { color: "#444" }]}>📍 {item.sede_nome}</Text>
-                    </View>
-                    <Text style={[st.cardPrice, isCancellato && { color: "#444" }]}>€{item.servizio_prezzo}</Text>
+                    {/* Prezzo separato dalla stessa linea sottile delle card servizi */}
+                    {item.servizio_prezzo != null && (
+                      <View style={st.priceBox}>
+                        <Text style={[st.priceSymbol, isCancellato && st.priceSpento]}>€</Text>
+                        <Text style={[st.cardPrice, isCancellato && st.priceSpento]}>
+                          {Number(item.servizio_prezzo).toFixed(0)}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <View style={st.cardFoot}>
-                    <View style={[st.statoChip, isCancellato && { backgroundColor: "rgba(244,67,54,0.1)" }]}>
+                    <View style={[st.statoChip, isCancellato && st.statoChipCancellato]}>
+                      <Ionicons
+                        name={isCancellato ? "close-circle-outline" : "checkmark-circle-outline"}
+                        size={14}
+                        color={isCancellato ? "#F44336" : "#4CAF50"}
+                      />
                       <Text style={[st.statoText, isCancellato && { color: "#F44336" }]}>
-                        {isCancellato ? "● Cancellato" : "● Confermato"}
+                        {isCancellato ? "Cancellato" : "Confermato"}
                       </Text>
                     </View>
                     {isCancellato ? (
-                      <Text style={{ fontSize: 11, color: "#555", fontStyle: "italic" }}>Assenza barbiere</Text>
+                      <Text style={st.notaCancellato}>Assenza barbiere</Text>
                     ) : (
                       <Pressable
-                        style={st.cancelBtn}
-                        onPress={() => cancella(item.id)}
+                        style={({ pressed }) => [st.cancelBtn, pressed && st.cancelBtnPremuto]}
+                        onPress={() => setDaCancellare(item.id)}
                       >
+                        <Ionicons name="trash-outline" size={14} color="#F44336" />
                         <Text style={st.cancelText}>Cancella</Text>
                       </Pressable>
                     )}
@@ -193,6 +229,15 @@ export default function MieiAppuntamenti() {
         </>
       )}
       </View>
+
+      <ConfermaModale
+        visibile={daCancellare != null}
+        messaggio="Sei sicuro di voler cancellare questo appuntamento?"
+        inCorso={cancellazioneInCorso}
+        errore={erroreCancellazione}
+        onAnnulla={chiudiModale}
+        onConferma={confermaCancellazione}
+      />
     </SafeAreaView>
   );
 }
