@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { supabase } from "../lib/supabase";
-import React, { useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -19,10 +19,91 @@ import { st } from "../styles/mieiAppuntamentiStyles";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
 
+const GIORNI = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+const MESI = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+// "Mar 3 Novembre"
+const fmtData = (d: string) => {
+  const dt = new Date(d);
+  return `${GIORNI[dt.getDay()]} ${dt.getDate()} ${MESI[dt.getMonth()]}`;
+};
+
+// Props costanti della lista: oggetti/funzioni stabili, così aprire o chiudere il modale
+// (stato della pagina) non fa ridisegnare la FlatList né le card
+const chiaveAppuntamento = (i: any) => i.id.toString();
+const STILE_LISTA = { paddingBottom: 40 };
+
+// Card memoizzata: si ridisegna solo se cambia il suo appuntamento
+const CardAppuntamento = memo(function CardAppuntamento({
+  item,
+  onCancella,
+}: {
+  item: any;
+  onCancella: (id: number) => void;
+}) {
+  const isCancellato = item.stato === "cancellato";
+  const barrato = isCancellato && st.testoBarrato;  return (
+    <View style={[st.card, isCancellato && st.cardCancellata]}>
+      <View style={st.cardRow}>
+        {/* Informazioni: servizio e data/ora in evidenza, poi barbiere e sede allineati */}
+        <View style={st.cardInfo}>
+          <Text style={[st.cardServ, barrato]}>{item.servizio_nome}</Text>
+          <View style={st.dataOra}>
+            <Ionicons name="calendar-outline" size={15} color={isCancellato ? "#555" : "#D4AF37"} />
+            <Text style={[st.dataOraText, barrato]}>
+              {fmtData(item.data)} · {item.ora?.slice(0, 5)}
+            </Text>
+          </View>
+          <View style={st.dettaglio}>
+            <Ionicons name="person-outline" size={14} color="#777" />
+            <Text style={st.dettaglioLabel}>Barbiere</Text>
+            <Text style={st.dettaglioValore}>{item.barbiere_nome}</Text>
+          </View>
+          <View style={st.dettaglio}>
+            <Ionicons name="location-outline" size={14} color="#777" />
+            <Text style={st.dettaglioLabel}>Sede</Text>
+            <Text style={st.dettaglioValore}>{item.sede_nome}</Text>
+          </View>
+        </View>
+        {/* Prezzo separato dalla stessa linea sottile delle card servizi */}
+        {item.servizio_prezzo != null && (
+          <View style={st.priceBox}>
+            <Text style={[st.priceSymbol, isCancellato && st.priceSpento]}>€</Text>
+            <Text style={[st.cardPrice, isCancellato && st.priceSpento]}>
+              {Number(item.servizio_prezzo).toFixed(0)}
+            </Text>
+          </View>
+        )}
+      </View>
+      <View style={st.cardFoot}>
+        <View style={[st.statoChip, isCancellato && st.statoChipCancellato]}>
+          <Ionicons
+            name={isCancellato ? "close-circle-outline" : "checkmark-circle-outline"}
+            size={14}
+            color={isCancellato ? "#F44336" : "#4CAF50"}
+          />
+          <Text style={[st.statoText, isCancellato && { color: "#F44336" }]}>
+            {isCancellato ? "Cancellato" : "Confermato"}
+          </Text>
+        </View>
+        {isCancellato ? (
+          <Text style={st.notaCancellato}>Assenza barbiere</Text>
+        ) : (
+          <Pressable
+            style={({ pressed }) => [st.cancelBtn, pressed && st.cancelBtnPremuto]}
+            onPress={() => onCancella(item.id)}
+          >
+            <Ionicons name="trash-outline" size={14} color="#F44336" />
+            <Text style={st.cancelText}>Cancella</Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
+});
+
 export default function MieiAppuntamenti() {
   const [prenotazioni, setPrenotazioni] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState("");
   const [showBanner, setShowBanner] = useState(false);
   const headerOp = useRef(new Animated.Value(0)).current;
 
@@ -40,56 +121,57 @@ export default function MieiAppuntamenti() {
   }, []);
 
   const init = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const t = session?.access_token || "";
-    setToken(t);
-
     const visti = await AsyncStorage.getItem("appuntamenti_visti");
     if (!visti) setShowBanner(true);
-
-    carica(t || "");
+    carica();
   };
 
   const getToken = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    const t = session?.access_token || token;
-    if (t && t !== token) setToken(t);
-    return t;
+    return session?.access_token || "";
   };
 
-  const carica = async (t?: string) => {
-    setLoading(true);
-    const tkn = t || (await getToken());
+  // silenzioso: riallinea la lista senza sostituirla con la rotellina (es. dopo una cancellazione)
+  const carica = async (silenzioso = false) => {
+    if (!silenzioso) setLoading(true);
     try {
       const res = await fetch(`${BACKEND_URL}/api/prenotazioni/miei`, {
-        headers: { Authorization: `Bearer ${tkn}` },
+        headers: { Authorization: `Bearer ${await getToken()}` },
       });
       const data = await res.json();
-      setPrenotazioni(Array.isArray(data) ? data : []);
+      if (Array.isArray(data)) setPrenotazioni(data);
+      else if (!silenzioso) setPrenotazioni([]);
     } catch (err) {}
-    setLoading(false);
+    if (!silenzioso) setLoading(false);
   };
 
   // Cancellazione in due passi: "Cancella" apre il modale, "Sì, cancella" elimina davvero
   const [daCancellare, setDaCancellare] = useState<number | null>(null);
   const [cancellazioneInCorso, setCancellazioneInCorso] = useState(false);
   const [erroreCancellazione, setErroreCancellazione] = useState("");
+  // Valori correnti letti dai callback stabili (che quindi non cambiano a ogni render)
+  const corrente = useRef({ daCancellare, cancellazioneInCorso });
+  corrente.current = { daCancellare, cancellazioneInCorso };
 
-  const chiudiModale = () => {
-    if (cancellazioneInCorso) return;
-    setDaCancellare(null);
+  const apriModale = useCallback((id: number) => {
     setErroreCancellazione("");
-  };
+    setDaCancellare(id);
+  }, []);
 
-  const confermaCancellazione = async () => {
-    if (daCancellare == null) return;
+  const chiudiModale = useCallback(() => {
+    if (corrente.current.cancellazioneInCorso) return;
+    setDaCancellare(null);
+  }, []);
+
+  const confermaCancellazione = useCallback(async () => {
+    const id = corrente.current.daCancellare;
+    if (id == null || corrente.current.cancellazioneInCorso) return;
     setCancellazioneInCorso(true);
     setErroreCancellazione("");
     try {
-      const tkn = await getToken();
-      const res = await fetch(`${BACKEND_URL}/api/prenotazioni/${daCancellare}`, {
+      const res = await fetch(`${BACKEND_URL}/api/prenotazioni/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${tkn}` },
+        headers: { Authorization: `Bearer ${await getToken()}` },
       });
       // 404 = già cancellata: in entrambi i casi la lista va riallineata
       if (!res.ok && res.status !== 404) {
@@ -97,23 +179,20 @@ export default function MieiAppuntamenti() {
         setErroreCancellazione(data.error || "Impossibile cancellare. Riprova.");
         return;
       }
-      setPrenotazioni((prev) => prev.filter((p) => p.id !== daCancellare));
       setDaCancellare(null);
-      carica();
+      setPrenotazioni((prev) => prev.filter((p) => p.id !== id));
+      carica(true);
     } catch {
       setErroreCancellazione("Impossibile collegarsi al server.");
     } finally {
       setCancellazioneInCorso(false);
     }
-  };
+  }, []);
 
-  const GIORNI = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
-  const MESI = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
-  // "Mar 3 Novembre"
-  const fmtData = (d: string) => {
-    const dt = new Date(d);
-    return `${GIORNI[dt.getDay()]} ${dt.getDate()} ${MESI[dt.getMonth()]}`;
-  };
+  const renderItem = useCallback(
+    ({ item }: { item: any }) => <CardAppuntamento item={item} onCancella={apriModale} />,
+    [apriModale],
+  );
 
   return (
     <SafeAreaView style={st.container}>
@@ -160,71 +239,10 @@ export default function MieiAppuntamenti() {
           )}
           <FlatList
             data={prenotazioni}
-            keyExtractor={(i) => i.id.toString()}
+            keyExtractor={chiaveAppuntamento}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 40 }}
-            renderItem={({ item }) => {
-              const isCancellato = item.stato === "cancellato";
-              const barrato = isCancellato && st.testoBarrato;
-              return (
-                <View style={[st.card, isCancellato && st.cardCancellata]}>
-                  <View style={st.cardRow}>
-                    {/* Informazioni: servizio e data/ora in evidenza, poi barbiere e sede allineati */}
-                    <View style={st.cardInfo}>
-                      <Text style={[st.cardServ, barrato]}>{item.servizio_nome}</Text>
-                      <View style={st.dataOra}>
-                        <Ionicons name="calendar-outline" size={15} color={isCancellato ? "#555" : "#D4AF37"} />
-                        <Text style={[st.dataOraText, barrato]}>
-                          {fmtData(item.data)} · {item.ora?.slice(0, 5)}
-                        </Text>
-                      </View>
-                      <View style={st.dettaglio}>
-                        <Ionicons name="person-outline" size={14} color="#777" />
-                        <Text style={st.dettaglioLabel}>Barbiere</Text>
-                        <Text style={st.dettaglioValore}>{item.barbiere_nome}</Text>
-                      </View>
-                      <View style={st.dettaglio}>
-                        <Ionicons name="location-outline" size={14} color="#777" />
-                        <Text style={st.dettaglioLabel}>Sede</Text>
-                        <Text style={st.dettaglioValore}>{item.sede_nome}</Text>
-                      </View>
-                    </View>
-                    {/* Prezzo separato dalla stessa linea sottile delle card servizi */}
-                    {item.servizio_prezzo != null && (
-                      <View style={st.priceBox}>
-                        <Text style={[st.priceSymbol, isCancellato && st.priceSpento]}>€</Text>
-                        <Text style={[st.cardPrice, isCancellato && st.priceSpento]}>
-                          {Number(item.servizio_prezzo).toFixed(0)}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={st.cardFoot}>
-                    <View style={[st.statoChip, isCancellato && st.statoChipCancellato]}>
-                      <Ionicons
-                        name={isCancellato ? "close-circle-outline" : "checkmark-circle-outline"}
-                        size={14}
-                        color={isCancellato ? "#F44336" : "#4CAF50"}
-                      />
-                      <Text style={[st.statoText, isCancellato && { color: "#F44336" }]}>
-                        {isCancellato ? "Cancellato" : "Confermato"}
-                      </Text>
-                    </View>
-                    {isCancellato ? (
-                      <Text style={st.notaCancellato}>Assenza barbiere</Text>
-                    ) : (
-                      <Pressable
-                        style={({ pressed }) => [st.cancelBtn, pressed && st.cancelBtnPremuto]}
-                        onPress={() => setDaCancellare(item.id)}
-                      >
-                        <Ionicons name="trash-outline" size={14} color="#F44336" />
-                        <Text style={st.cancelText}>Cancella</Text>
-                      </Pressable>
-                    )}
-                  </View>
-                </View>
-              );
-            }}
+            contentContainerStyle={STILE_LISTA}
+            renderItem={renderItem}
           />
         </>
       )}

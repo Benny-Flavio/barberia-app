@@ -1,10 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useRef } from "react";
-import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { memo, useEffect, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+
+const DURATA = 200; // ms, apertura e chiusura
 
 // Modale di conferma nero/oro interno all'app (al posto di window.confirm / Alert di sistema).
 // Va messo come ultimo figlio della pagina: copre tutto lo schermo e oscura lo sfondo.
-export default function ConfermaModale({
+// Animazione con transizioni CSS su opacity/transform (gestite dal browser, senza lavoro JS per frame):
+// sfondo in dissolvenza, riquadro con fade + leggero scale. Resta montato durante la chiusura per il fade-out.
+function ConfermaModale({
   visibile,
   messaggio,
   testoConferma = "Sì, cancella",
@@ -23,26 +27,29 @@ export default function ConfermaModale({
   onConferma: () => void;
   onAnnulla: () => void;
 }) {
-  const opacita = useRef(new Animated.Value(0)).current;
-  const scala = useRef(new Animated.Value(0.92)).current;
+  const [montato, setMontato] = useState(visibile);
+  const [aperto, setAperto] = useState(false);
 
   useEffect(() => {
-    if (!visibile) return;
-    opacita.setValue(0);
-    scala.setValue(0.92);
-    Animated.parallel([
-      Animated.timing(opacita, { toValue: 1, duration: 180, useNativeDriver: true }),
-      Animated.spring(scala, { toValue: 1, friction: 7, useNativeDriver: true }),
-    ]).start();
+    if (visibile) {
+      setMontato(true);
+      // Prima si dipinge lo stato iniziale (trasparente), poi si attiva la transizione
+      let r2 = 0;
+      const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => setAperto(true)); });
+      return () => { cancelAnimationFrame(r1); cancelAnimationFrame(r2); };
+    }
+    setAperto(false);
+    const t = setTimeout(() => setMontato(false), DURATA);
+    return () => clearTimeout(t);
   }, [visibile]);
 
-  if (!visibile) return null;
+  if (!montato) return null;
 
   return (
-    <Animated.View style={[st.overlay, { opacity: opacita }]}>
+    <View style={[st.overlay, aperto ? st.overlayAperto : st.overlayChiuso]} pointerEvents={visibile ? "auto" : "none"}>
       {/* Tocco sullo sfondo = Indietro (non durante l'operazione) */}
       <Pressable style={StyleSheet.absoluteFill} onPress={inCorso ? undefined : onAnnulla} />
-      <Animated.View style={[st.box, { transform: [{ scale: scala }] }]}>
+      <View style={[st.box, aperto ? st.boxAperto : st.boxChiuso]}>
         <View style={st.icona}>
           <Ionicons name="trash-outline" size={26} color="#D4AF37" />
         </View>
@@ -64,10 +71,17 @@ export default function ConfermaModale({
             {inCorso ? <ActivityIndicator color="#0A0A0A" /> : <Text style={st.btnConfermaText}>{testoConferma}</Text>}
           </Pressable>
         </View>
-      </Animated.View>
-    </Animated.View>
+      </View>
+    </View>
   );
 }
+
+export default memo(ConfermaModale);
+
+const transizione = {
+  transitionDuration: `${DURATA}ms`,
+  transitionTimingFunction: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+} as any;
 
 const st = StyleSheet.create({
   overlay: {
@@ -81,7 +95,11 @@ const st = StyleSheet.create({
     justifyContent: "center",
     padding: 24,
     zIndex: 100,
+    transitionProperty: "opacity",
+    ...transizione,
   },
+  overlayAperto: { opacity: 1 },
+  overlayChiuso: { opacity: 0 },
   box: {
     width: "100%",
     maxWidth: 380,
@@ -91,7 +109,12 @@ const st = StyleSheet.create({
     borderColor: "rgba(212,175,55,0.35)",
     padding: 24,
     alignItems: "center",
-  },
+    transitionProperty: "opacity, transform",
+    willChange: "opacity, transform",
+    ...transizione,
+  } as any,
+  boxAperto: { opacity: 1, transform: [{ scale: 1 }] },
+  boxChiuso: { opacity: 0, transform: [{ scale: 0.94 }] },
   icona: {
     width: 56,
     height: 56,

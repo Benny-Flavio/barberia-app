@@ -3,7 +3,8 @@ import { DarkTheme, ThemeProvider } from "@react-navigation/native";
 import { router, Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { conTimeout, ServizioNonRaggiungibile } from "../lib/conTimeout";
 import { supabase } from "../lib/supabase";
 
 // ── Auth guard + route guard per ruolo (unico punto, vale per tutte le pagine) ──
@@ -16,11 +17,16 @@ const isStaff = (ruolo: string | null) => ruolo === "admin" || ruolo === "super_
 
 // Ruolo dell'utente loggato, letto da profili (stessa fonte del login) e tenuto in memoria per utente
 let ruoloInCache: { userId: string; ruolo: string | null } | null = null;
+// Ogni chiamata a Supabase ha un tempo massimo: se non risponde si mostra "Riprova", non una rotellina infinita
 const ruoloUtenteLoggato = async (): Promise<{ loggato: boolean; ruolo: string | null }> => {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await conTimeout(supabase.auth.getSession());
   if (!session) return { loggato: false, ruolo: null };
   if (ruoloInCache?.userId !== session.user.id) {
-    const { data } = await supabase.from("profili").select("ruolo").eq("id", session.user.id).single();
+    const { data, error } = await conTimeout(
+      supabase.from("profili").select("ruolo").eq("id", session.user.id).single(),
+    );
+    // PGRST116 = nessun profilo per questo utente (ruolo assente); qualsiasi altro errore = Supabase non risponde bene
+    if (error && error.code !== "PGRST116") throw new ServizioNonRaggiungibile();
     ruoloInCache = { userId: session.user.id, ruolo: data?.ruolo ?? null };
   }
   return { loggato: true, ruolo: ruoloInCache.ruolo };
@@ -31,6 +37,9 @@ export default function RootLayout() {
   // Pagina per cui il controllo del ruolo è concluso; finché non lo è, la pagina resta coperta
   const [verificata, setVerificata] = useState<string | null>(null);
   const ultimaVerifica = useRef(0);
+  // Supabase non ha risposto in tempo: al posto della rotellina, messaggio + "Riprova"
+  const [irraggiungibile, setIrraggiungibile] = useState(false);
+  const [tentativo, setTentativo] = useState(0);
 
   useEffect(() => {
     const {
@@ -50,6 +59,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (pathname === "/") return;
     const id = ++ultimaVerifica.current;
+    setIrraggiungibile(false);
     (async () => {
       try {
         const { loggato, ruolo } = await ruoloUtenteLoggato();
@@ -61,11 +71,12 @@ export default function RootLayout() {
         if (!areaStaff && isStaff(ruolo)) return router.replace("/admin-dashboard" as any);
         setVerificata(pathname);
       } catch {
-        // Verifica impossibile (es. errore di rete): la pagina non viene mostrata, si torna al login
-        if (id === ultimaVerifica.current) router.replace("/" as any);
+        // Verifica impossibile (Supabase lento o irraggiungibile, rete assente): la pagina resta coperta,
+        // ma con un messaggio e "Riprova" invece di una rotellina infinita o di un rimbalzo al login
+        if (id === ultimaVerifica.current) setIrraggiungibile(true);
       }
     })();
-  }, [pathname]);
+  }, [pathname, tentativo]);
 
   const inVerifica = pathname !== "/" && verificata !== pathname;
 
@@ -89,8 +100,25 @@ export default function RootLayout() {
         </Stack>
         {/* Copre la pagina finché il ruolo non è verificato: nessun contenuto dell'area sbagliata a schermo */}
         {inVerifica && (
-          <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#0A0A0A", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
-            <ActivityIndicator color="#D4AF37" size="large" />
+          <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#0A0A0A", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 32 }}>
+            {irraggiungibile ? (
+              <>
+                <Text style={{ color: "#FFF", fontSize: 18, fontWeight: "800", textAlign: "center" }}>
+                  Servizio momentaneamente non raggiungibile
+                </Text>
+                <Text style={{ color: "#888", fontSize: 14, textAlign: "center", marginTop: 8, lineHeight: 20 }}>
+                  Controlla la connessione e riprova tra qualche istante.
+                </Text>
+                <Pressable
+                  onPress={() => setTentativo((t) => t + 1)}
+                  style={{ marginTop: 24, backgroundColor: "#D4AF37", paddingVertical: 14, paddingHorizontal: 40, borderRadius: 12, cursor: "pointer" as any }}
+                >
+                  <Text style={{ color: "#0A0A0A", fontSize: 16, fontWeight: "800" }}>Riprova</Text>
+                </Pressable>
+              </>
+            ) : (
+              <ActivityIndicator color="#D4AF37" size="large" />
+            )}
           </View>
         )}
         <StatusBar style="light" />

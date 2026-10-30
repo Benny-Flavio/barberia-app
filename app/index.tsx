@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { conTimeout, ServizioNonRaggiungibile } from "../lib/conTimeout";
 import { supabase } from "../lib/supabase";
 import { s } from "../styles/indexStyles";
 
@@ -156,6 +157,25 @@ export default function Login() {
     setOtpCode("");
   };
 
+  // Invia il codice di accesso a un cliente già registrato. Ritorna il messaggio d'errore da mostrare, o null se inviato
+  const inviaCodice = async (indirizzo: string): Promise<string | null> => {
+    try {
+      const { error } = await conTimeout(
+        supabase.auth.signInWithOtp({ email: indirizzo, options: { shouldCreateUser: false } }),
+        15000,
+      );
+      if (!error) return null;
+      if (error.status === 429 || error.code === "over_email_send_rate_limit" || error.message?.toLowerCase().includes("rate limit")) {
+        return "Troppi invii ravvicinati. Attendi qualche minuto e riprova.";
+      }
+      return "Impossibile inviare il codice di accesso. Riprova tra poco.";
+    } catch (e) {
+      return e instanceof ServizioNonRaggiungibile
+        ? "Servizio momentaneamente non raggiungibile. Riprova tra qualche istante."
+        : "Impossibile inviare il codice di accesso. Controlla la connessione e riprova.";
+    }
+  };
+
   // Tab Accedi — step 1: controlla l'email via RPC
   const controllaEmail = async () => {
     const trimmedEmail = email.trim().toLowerCase();
@@ -167,12 +187,17 @@ export default function Login() {
     setErrore("");
     setLoading(true);
 
-    const { data: role, error } = await supabase.rpc("check_user_role", {
-      user_email: trimmedEmail,
-    });
-
-    if (error) {
-      setErrore("Errore di connessione. Riprova.");
+    let role: any = null;
+    try {
+      const { data, error } = await conTimeout(
+        supabase.rpc("check_user_role", { user_email: trimmedEmail }),
+      );
+      if (error) throw error;
+      role = data;
+    } catch (e) {
+      setErrore(e instanceof ServizioNonRaggiungibile
+        ? "Servizio momentaneamente non raggiungibile. Riprova tra qualche istante."
+        : "Errore di connessione. Riprova.");
       setLoading(false);
       return;
     }
@@ -183,10 +208,13 @@ export default function Login() {
       setStep("email");
       setErrore("Email non trovata. Compila i dati per registrarti.");
     } else if (role === "cliente") {
-      await supabase.auth.signInWithOtp({
-        email: trimmedEmail,
-        options: { shouldCreateUser: false },
-      });
+      // Si passa alla schermata del codice solo se l'email è partita davvero
+      const erroreInvio = await inviaCodice(trimmedEmail);
+      if (erroreInvio) {
+        setErrore(erroreInvio);
+        setLoading(false);
+        return;
+      }
       setStep("otp_code");
     } else {
       // admin o super_admin → mostra campo password
@@ -258,10 +286,11 @@ export default function Login() {
   };
 
   const rinviaOtp = async () => {
-    await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: { shouldCreateUser: false },
-    });
+    const erroreInvio = await inviaCodice(email.trim().toLowerCase());
+    if (erroreInvio) {
+      setErrore(erroreInvio);
+      return;
+    }
     setOtpCode("");
     setOtpStato(null);
     setErrore("Codice inviato di nuovo!");
