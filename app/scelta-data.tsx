@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -58,6 +59,7 @@ LocaleConfig.locales["it"] = {
 LocaleConfig.defaultLocale = "it";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
+const ORO = "#D4AF37";
 
 export default function SceltaData() {
   // data / barbiere_id / ora arrivano solo tornando dal riepilogo dopo un refresh della pagina
@@ -255,10 +257,12 @@ export default function SceltaData() {
           <Text style={styles.title}>Prenota Appuntamento</Text>
           <View style={styles.chipRow}>
             <View style={styles.chip}>
-              <Text style={styles.chipText}>📍 {nome_sede}</Text>
+              <Ionicons name="location-outline" size={14} color={ORO} />
+              <Text style={styles.chipText}>{nome_sede}</Text>
             </View>
             <View style={styles.chip}>
-              <Text style={styles.chipText}>✂️ {servizio_nome}</Text>
+              <Ionicons name="cut-outline" size={14} color={ORO} />
+              <Text style={styles.chipText}>{servizio_nome}</Text>
             </View>
           </View>
         </Animated.View>
@@ -338,7 +342,14 @@ export default function SceltaData() {
                           isSelected && styles.barberAvatarSelected,
                         ]}
                       >
-                        <Text style={styles.barberAvatarText}>💈</Text>
+                        <Text
+                          style={[
+                            styles.barberAvatarText,
+                            isSelected && styles.barberAvatarTextSelected,
+                          ]}
+                        >
+                          {b.nome?.[0]?.toUpperCase()}
+                        </Text>
                       </View>
                       <Text
                         style={[
@@ -373,7 +384,9 @@ export default function SceltaData() {
             </View>
             {federicoSoloChiamata ? (
               <View style={styles.chiamataBox}>
-                <Text style={{ fontSize: 28, marginBottom: 12 }}>📞</Text>
+                <View style={styles.chiamataIcona}>
+                  <Ionicons name="call-outline" size={24} color={ORO} />
+                </View>
                 <Text style={styles.chiamataTitle}>Solo su chiamata</Text>
                 <Text style={styles.chiamataText}>
                   Per prenotare con Federico il{" "}
@@ -387,19 +400,22 @@ export default function SceltaData() {
                   .
                 </Text>
                 <View style={styles.chiamataNumero}>
+                  <Ionicons name="call" size={16} color={ORO} />
                   <Text style={styles.chiamataNumeroText}>
-                    📞{" "}
                     {new Date(dataSelezionata).getDay() === 5
                       ? "351 842 0733"
                       : "06 9521 0497"}
                   </Text>
                 </View>
-                <Text style={styles.chiamataSede}>
-                  📍 Sede{" "}
-                  {new Date(dataSelezionata).getDay() === 5
-                    ? "Frascati"
-                    : "Colonna"}
-                </Text>
+                <View style={styles.chiamataSedeRiga}>
+                  <Ionicons name="location-outline" size={14} color="#888" />
+                  <Text style={styles.chiamataSede}>
+                    Sede{" "}
+                    {new Date(dataSelezionata).getDay() === 5
+                      ? "Frascati"
+                      : "Colonna"}
+                  </Text>
+                </View>
               </View>
             ) : loadingOrari ? (
               <ActivityIndicator
