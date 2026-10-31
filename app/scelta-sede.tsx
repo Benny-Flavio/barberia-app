@@ -70,7 +70,7 @@ export default function SceltaSede() {
               <Image source={FOTO_COLONNA} style={st.sedeImg} resizeMode="cover" />
               <View style={st.sedeCardInfo}>
                 <Text style={st.sedeName}>Colonna</Text>
-                <Text style={st.sedeAddr}>Via Roma 1, Colonna (RM)</Text>
+                <Text style={st.sedeAddr}>Via Casilina 27, Colonna (RM)</Text>
               </View>
             </Pressable>
           </Animated.View>
@@ -84,7 +84,7 @@ export default function SceltaSede() {
               <Image source={FOTO_FRASCATI} style={st.sedeImg} resizeMode="cover" />
               <View style={st.sedeCardInfo}>
                 <Text style={st.sedeName}>Frascati</Text>
-                <Text style={st.sedeAddr}>Corso Italia 15, Frascati (RM)</Text>
+                <Text style={st.sedeAddr}>Via S. Martino 9, Frascati (RM)</Text>
               </View>
             </Pressable>
           </Animated.View>

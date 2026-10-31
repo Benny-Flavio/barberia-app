@@ -390,8 +390,8 @@ export default function SceltaData() {
                   <Text style={styles.chiamataNumeroText}>
                     📞{" "}
                     {new Date(dataSelezionata).getDay() === 5
-                      ? "06 7654321"
-                      : "06 1234567"}
+                      ? "351 842 0733"
+                      : "06 9521 0497"}
                   </Text>
                 </View>
                 <Text style={styles.chiamataSede}>
