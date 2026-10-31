@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Animated,
   Linking,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -56,7 +57,17 @@ const ORARI = [
 const linkMaps = (indirizzo: string) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(indirizzo)}`;
 const linkTelefono = (telefono: string) => `tel:${telefono.replace(/\s/g, "")}`;
-const apri = (url: string) => Linking.openURL(url).catch(() => {});
+// Usato da tutti gli elementi cliccabili della pagina (Mappa, Chiama, Instagram, indirizzo, telefono, barbieri).
+// Su web Linking.openURL apre una nuova scheda (window.open _blank): su iOS, quando il link passa all'app
+// nativa (Maps, telefono, Instagram), quella scheda resta vuota e il cliente ci ritorna sopra.
+// Quindi su web si naviga nella stessa scheda; su native resta Linking.openURL.
+const apri = (url: string) => {
+  if (Platform.OS === "web") {
+    window.location.href = url;
+    return;
+  }
+  Linking.openURL(url).catch(() => {});
+};
 
 // Giorni di turno nella sede (0=dom … 6=sab): consecutivi → "Mar - Sab", altrimenti "Mar, Gio, Sab"
 const GIORNI_BREVI = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
