@@ -26,16 +26,18 @@ export const s = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
+  // Icona su fondo nero con bordo colorato in base al tipo (vedi STILE_TIPO in app/messaggi.tsx)
   msgIconBox: {
     width: 40,
     height: 40,
     borderRadius: 12,
+    backgroundColor: "#0A0A0A",
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
-  msgIconAlert: { backgroundColor: "rgba(244,67,54,0.1)" },
-  msgIconInfo: { backgroundColor: "rgba(212,175,55,0.1)" },
   msgFrom: { fontSize: 14, fontWeight: "700", color: "#FFF" },
+  msgTitolo: { fontSize: 16, fontWeight: "800", marginBottom: 6 },
   msgDate: { fontSize: 11, color: "#555", marginTop: 2 },
   unreadDot: {
     width: 10,

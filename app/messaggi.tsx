@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { supabase } from "../lib/supabase";
 import React, { useEffect, useRef, useState } from "react";
@@ -16,6 +16,28 @@ import { compatto } from "../lib/compatto";
 import { s } from "../styles/messaggiStyles";
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
+
+// L'inbox raccoglie messaggi automatici sugli appuntamenti e comunicazioni manuali dello staff
+type TipoMessaggio = "cancellazione" | "ripristino" | "comunicazione" | "info";
+const STILE_TIPO: Record<TipoMessaggio, {
+  icona: React.ComponentProps<typeof Ionicons>["name"];
+  colore: string;
+  bordo: string;
+  coloreTitolo: string;
+  mittente: string;
+}> = {
+  cancellazione: { icona: "alert-circle-outline", colore: "#E5734A", bordo: "rgba(229,115,74,0.35)", coloreTitolo: "#E5734A", mittente: "Bulldog Barber Shop" },
+  ripristino: { icona: "checkmark-circle-outline", colore: "#D4AF37", bordo: "rgba(212,175,55,0.3)", coloreTitolo: "#D4AF37", mittente: "Bulldog Barber Shop" },
+  comunicazione: { icona: "megaphone-outline", colore: "#D4AF37", bordo: "rgba(212,175,55,0.3)", coloreTitolo: "#FFF", mittente: "Staff Bulldog" },
+  info: { icona: "notifications-outline", colore: "#D4AF37", bordo: "rgba(212,175,55,0.3)", coloreTitolo: "#FFF", mittente: "Bulldog Barber Shop" },
+};
+// Il tipo arriva dal backend; per i messaggi creati prima del campo "tipo" si ricava dal testo
+const tipoMessaggio = (msg: any): TipoMessaggio => {
+  if (msg.tipo && msg.tipo !== "info" && msg.tipo in STILE_TIPO) return msg.tipo;
+  if (msg.messaggio?.startsWith("Ci scusiamo per il disagio")) return "cancellazione";
+  if (msg.messaggio?.startsWith("Buone notizie!")) return "ripristino";
+  return "info";
+};
 
 export default function Messaggi() {
   const [messaggi, setMessaggi] = useState<any[]>([]);
@@ -94,7 +116,7 @@ export default function Messaggi() {
         ) : messaggi.length === 0 ? (
           <View style={s.emptyBox}>
             <View style={s.emptyIconBox}>
-              <Text style={{ fontSize: 40 }}>💬</Text>
+              <Ionicons name="chatbubble-ellipses-outline" size={34} color="#D4AF37" />
             </View>
             <Text style={s.emptyTitle}>Nessun messaggio</Text>
             <Text style={s.emptySub}>
@@ -138,8 +160,8 @@ function MsgCard({ msg, index, formattaData }: any) {
     }, index * 80);
   }, []);
 
-  const isAlert =
-    msg.messaggio?.includes("cancellato") || msg.messaggio?.includes("assente");
+  const tipo = tipoMessaggio(msg);
+  const stile = STILE_TIPO[tipo];
 
   const renderTestoFormattato = (testo: string) => {
     if (!testo) return null;
@@ -165,15 +187,18 @@ function MsgCard({ msg, index, formattaData }: any) {
       ]}
     >
       <View style={s.msgHeader}>
-        <View style={[s.msgIconBox, isAlert ? s.msgIconAlert : s.msgIconInfo]}>
-          <Text style={{ fontSize: 18 }}>{isAlert ? "⚠️" : "📢"}</Text>
+        <View style={[s.msgIconBox, { borderColor: stile.bordo }]}>
+          <Ionicons name={stile.icona} size={19} color={stile.colore} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.msgFrom}>Bulldog Barber Shop</Text>
+          <Text style={s.msgFrom}>{stile.mittente}</Text>
           <Text style={s.msgDate}>{formattaData(msg.created_at)}</Text>
         </View>
         {!msg.letta && <View style={s.unreadDot} />}
       </View>
+      {msg.titolo ? (
+        <Text style={[s.msgTitolo, { color: stile.coloreTitolo }]}>{msg.titolo}</Text>
+      ) : null}
       <Text style={s.msgText}>{renderTestoFormattato(msg.messaggio)}</Text>
     </Animated.View>
   );
