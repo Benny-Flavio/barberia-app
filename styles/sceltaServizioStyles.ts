@@ -8,6 +8,9 @@ export const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: "800", color: "#FFF", marginBottom: 10 },
   sedeChip: {
     alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     backgroundColor: "rgba(212, 175, 55, 0.1)",
     paddingVertical: 6,
     paddingHorizontal: 14,

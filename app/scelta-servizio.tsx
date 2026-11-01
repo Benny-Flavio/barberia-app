@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -88,7 +89,8 @@ export default function SceltaServizio() {
           </Pressable>
           <Text style={styles.title}>Cosa facciamo oggi?</Text>
           <View style={styles.sedeChip}>
-            <Text style={styles.sedeChipText}>📍 {nome_sede}</Text>
+            <Ionicons name="location-outline" size={15} color="#D4AF37" />
+            <Text style={styles.sedeChipText}>{nome_sede}</Text>
           </View>
         </Animated.View>
 

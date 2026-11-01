@@ -80,6 +80,9 @@ export default function SceltaData() {
   const step2Opacity = useRef(new Animated.Value(0)).current;
   const step3Opacity = useRef(new Animated.Value(0)).current;
   const daRipristinare = useRef<{ barbiere_id?: string; ora?: string } | null>(null);
+  // Mese mostrato dal calendario quando si ripristina una data: senza, il calendario si apre sul mese
+  // corrente e una data già scelta nel mese successivo resterebbe nascosta
+  const [meseCalendario, setMeseCalendario] = useState<string | undefined>(undefined);
 
   const oggi = new Date();
   const dataOggiString = oggi.toISOString().split("T")[0];
@@ -97,6 +100,7 @@ export default function SceltaData() {
     if (typeof data === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data)) {
       daRipristinare.current = { barbiere_id: barbiere_id as string, ora: ora as string };
       setDataSelezionata(data);
+      setMeseCalendario(data);
     }
   }, []);
 
@@ -276,6 +280,7 @@ export default function SceltaData() {
           </View>
           <View style={styles.calendarContainer}>
             <Calendar
+              initialDate={meseCalendario}
               firstDay={1}
               minDate={dataOggiString}
               maxDate={dataMassimaString}
