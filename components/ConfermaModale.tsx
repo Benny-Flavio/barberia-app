@@ -15,6 +15,7 @@ function ConfermaModale({
   testoAnnulla = "Indietro",
   inCorso = false,
   errore = "",
+  icona = "trash-outline",
   onConferma,
   onAnnulla,
 }: {
@@ -24,6 +25,7 @@ function ConfermaModale({
   testoAnnulla?: string;
   inCorso?: boolean;
   errore?: string;
+  icona?: React.ComponentProps<typeof Ionicons>["name"];
   onConferma: () => void;
   onAnnulla: () => void;
 }) {
@@ -51,7 +53,7 @@ function ConfermaModale({
       <Pressable style={StyleSheet.absoluteFill} onPress={inCorso ? undefined : onAnnulla} />
       <View style={[st.box, aperto ? st.boxAperto : st.boxChiuso]}>
         <View style={st.icona}>
-          <Ionicons name="trash-outline" size={26} color="#D4AF37" />
+          <Ionicons name={icona} size={26} color="#D4AF37" />
         </View>
         <Text style={st.messaggio}>{messaggio}</Text>
         {errore ? <Text style={st.errore}>{errore}</Text> : null}

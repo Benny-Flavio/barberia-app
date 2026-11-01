@@ -1,5 +1,6 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -16,6 +17,7 @@ import { Calendar, LocaleConfig } from "react-native-calendars";
 import { SHEET_H, st } from "../styles/adminDashboardStyles";
 import { supabase } from "../lib/supabase";
 import GuidaInstallazione from "../components/GuidaInstallazione";
+import ConfermaModale from "../components/ConfermaModale";
 
 LocaleConfig.locales["it"] = {
   monthNames: [
@@ -235,7 +237,7 @@ function CalendarioInline({ value, onChange, min, marginBottom = 14, disabledDow
   );
 }
 
-const ORE_DISP = ["07","08","09","10","11","12","13","14","15","16","17","18","19","20","21"];
+const ORE_DISP = ["07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22"];
 const MIN_DISP = ["00","10","20","30","40","50"];
 
 function OrarioInline({ value, onChange, marginBottom = 14 }: {
@@ -331,6 +333,309 @@ function OrarioInline({ value, onChange, marginBottom = 14 }: {
   );
 }
 
+// ── Area del titolare (solo super_admin): aperture straordinarie e comunicazioni ai clienti ──
+// Le conferme passano dal modale della dashboard (chiediConferma), che copre tutto lo schermo.
+type Conferma = {
+  messaggio: string;
+  icona: React.ComponentProps<typeof Ionicons>["name"];
+  testoConferma: string;
+  azione: () => Promise<string | void>; // restituisce il messaggio da mostrare, lancia in caso di errore
+};
+type Apertura = { id: number; data: string; sede_id: number; sede_nome: string; ora_inizio: string; ora_fine: string; barbieri: number[] };
+
+const GIORNI_LUNGHI = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
+// "2026-12-20" → "Domenica 20 Dicembre"
+const dataLunga = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${GIORNI_LUNGHI[new Date(y, m - 1, d).getDay()]} ${d} ${MESI_IT[m - 1]}`;
+};
+
+function Interruttore({ attivo, onCambia, etichetta, nota }: { attivo: boolean; onCambia: (v: boolean) => void; etichetta: string; nota?: string }) {
+  return (
+    <Pressable style={st.titToggleRow} onPress={() => onCambia(!attivo)}>
+      <View style={{ flex: 1 }}>
+        <Text style={st.titToggleLabel}>{etichetta}</Text>
+        {nota ? <Text style={st.titToggleNota}>{nota}</Text> : null}
+      </View>
+      <View style={[st.titToggleTrack, attivo && st.titToggleTrackOn]}>
+        <View style={[st.titToggleKnob, attivo && st.titToggleKnobOn]} />
+      </View>
+    </Pressable>
+  );
+}
+
+function PannelloTitolare({ sedi, elencoBarbieri, aperture, fetchAuth, msg, onAperture, chiediConferma }: {
+  sedi: any[];
+  elencoBarbieri: any[];
+  aperture: Apertura[];
+  fetchAuth: (url: string, options?: RequestInit) => Promise<Response>;
+  msg: (m: string) => void;
+  onAperture: () => void;
+  chiediConferma: (c: Conferma) => void;
+}) {
+  const oggi = new Date();
+  const oggiStr = `${oggi.getFullYear()}-${String(oggi.getMonth() + 1).padStart(2, "0")}-${String(oggi.getDate()).padStart(2, "0")}`;
+  const sedeNome = (id: number) => sedi.find((s) => s.id === id)?.nome || "";
+  const nomeBarbiere = (id: number) => elencoBarbieri.find((b) => b.id === id)?.nome || `#${id}`;
+
+  // ── Apertura straordinaria: UNA data (domenica o lunedì) per UNA sede ──
+  const [apSede, setApSede] = useState<number>(sedi[0]?.id ?? 0);
+  const [apData, setApData] = useState("");
+  const [apInizio, setApInizio] = useState("10:00");
+  const [apFine, setApFine] = useState("18:00");
+  const [apBarbieri, setApBarbieri] = useState<number[]>([]);
+  const [apAvvisa, setApAvvisa] = useState(true);
+  // Barbieri preselezionati: quelli che di solito lavorano nella sede scelta
+  useEffect(() => {
+    if (!apSede) return;
+    fetch(`${BACKEND_URL}/api/barbieri/${apSede}`)
+      .then((r) => r.json())
+      .then((l) => { if (Array.isArray(l)) setApBarbieri(l.map((b: any) => b.id)); })
+      .catch(() => {});
+  }, [apSede]);
+  const toggleBarbiere = (id: number) =>
+    setApBarbieri((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  const sblocca = () => {
+    if (!apData) return msg("Scegli la data da sbloccare");
+    if (minutiDa(apFine) - minutiDa(apInizio) < 40) return msg("L'apertura deve durare almeno 40 minuti");
+    if (apBarbieri.length === 0) return msg("Seleziona almeno un barbiere");
+    chiediConferma({
+      icona: "lock-open-outline",
+      testoConferma: "Sì, sblocca",
+      messaggio: `Sbloccare solo ${dataLunga(apData)} a ${sedeNome(apSede)}, dalle ${apInizio} alle ${apFine}?`
+        + (apAvvisa ? "\n\nTutti i clienti riceveranno l'avviso in app e via email." : ""),
+      azione: async () => {
+        const res = await fetchAuth(`${BACKEND_URL}/api/admin/aperture-straordinarie`, {
+          method: "POST",
+          body: JSON.stringify({ data: apData, sede_id: apSede, ora_inizio: apInizio, ora_fine: apFine, barbieri: apBarbieri, notifica_clienti: apAvvisa }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || "Errore");
+        setApData("");
+        onAperture();
+        if (apAvvisa) caricaStorico();
+        return d.messaggio;
+      },
+    });
+  };
+
+  const annullaApertura = (a: Apertura) =>
+    chiediConferma({
+      icona: "close-circle-outline",
+      testoConferma: "Sì, annulla",
+      messaggio: `Annullare l'apertura straordinaria di ${dataLunga(a.data)} a ${a.sede_nome}?\n\nGli appuntamenti già presi verranno cancellati e i clienti avvisati.`,
+      azione: async () => {
+        const res = await fetchAuth(`${BACKEND_URL}/api/admin/aperture-straordinarie/${a.id}`, { method: "DELETE" });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || "Errore");
+        onAperture();
+        return d.messaggio;
+      },
+    });
+
+  // ── Comunicazioni ai clienti ──
+  const [comTitolo, setComTitolo] = useState("");
+  const [comTesto, setComTesto] = useState("");
+  const [comSede, setComSede] = useState<number | null>(null); // null = tutti i clienti
+  const [nDestinatari, setNDestinatari] = useState<number | null>(null);
+  const [emailAttiva, setEmailAttiva] = useState(false);
+  const [storico, setStorico] = useState<any[]>([]);
+
+  const caricaStorico = async () => {
+    try {
+      const res = await fetchAuth(`${BACKEND_URL}/api/admin/comunicazioni`);
+      const d = await res.json();
+      if (Array.isArray(d)) setStorico(d);
+    } catch {}
+  };
+  useEffect(() => { caricaStorico(); }, []);
+  // Anteprima del numero di destinatari a ogni cambio di filtro
+  useEffect(() => {
+    setNDestinatari(null);
+    fetchAuth(`${BACKEND_URL}/api/admin/comunicazioni`, { method: "POST", body: JSON.stringify({ anteprima: true, sede_id: comSede }) })
+      .then((r) => r.json())
+      .then((d) => { if (d.anteprima) { setNDestinatari(d.destinatari); setEmailAttiva(!!d.email); } })
+      .catch(() => {});
+  }, [comSede]);
+
+  const inviaComunicazione = () => {
+    if (!comTitolo.trim()) return msg("Inserisci il titolo");
+    if (!comTesto.trim()) return msg("Scrivi il messaggio");
+    if (!nDestinatari) return msg("Nessun cliente destinatario");
+    chiediConferma({
+      icona: "megaphone-outline",
+      testoConferma: "Sì, invia",
+      messaggio: `Inviare «${comTitolo.trim()}» a ${nDestinatari} ${nDestinatari === 1 ? "cliente" : "clienti"}?`
+        + (emailAttiva ? "\n\nLo riceveranno in app e via email." : "\n\nLo riceveranno in app (email non ancora configurata)."),
+      azione: async () => {
+        const res = await fetchAuth(`${BACKEND_URL}/api/admin/comunicazioni`, {
+          method: "POST",
+          body: JSON.stringify({ titolo: comTitolo.trim(), messaggio: comTesto.trim(), sede_id: comSede }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || "Errore");
+        setComTitolo("");
+        setComTesto("");
+        caricaStorico();
+        return d.messaggio;
+      },
+    });
+  };
+
+  return (
+    <View style={st.titWrap}>
+      {/* ═══ APERTURE STRAORDINARIE ═══ */}
+      <View style={st.titCard}>
+        <View style={st.titCardHead}>
+          <View style={st.titIcona}><Ionicons name="calendar-outline" size={20} color="#D4AF37" /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.titCardTitle}>Apertura straordinaria</Text>
+            <Text style={st.titCardSub}>Sblocca un singolo giorno di chiusura (domenica o lunedì). Tutti gli altri restano chiusi.</Text>
+          </View>
+        </View>
+
+        <Text style={st.mLabel}>SEDE</Text>
+        <View style={[st.mGrid, { marginBottom: 14 }]}>
+          {sedi.map((s) => (
+            <Pressable key={s.id} style={[st.mChip, { flex: 1, alignItems: "center" }, apSede === s.id && st.mChipA]} onPress={() => setApSede(s.id)}>
+              <Text style={[st.mChipText, apSede === s.id && st.mChipTextA]}>{s.nome}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={st.mLabel}>DATA (SOLO DOMENICA O LUNEDÌ)</Text>
+        <CalendarioInline value={apData} onChange={setApData} min={oggiStr} disabledDow={[2, 3, 4, 5, 6]} />
+
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={st.mLabel}>DALLE</Text>
+            <OrarioInline value={apInizio} onChange={setApInizio} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.mLabel}>ALLE</Text>
+            <OrarioInline value={apFine} onChange={setApFine} />
+          </View>
+        </View>
+
+        <Text style={st.mLabel}>BARBIERI IN SERVIZIO</Text>
+        <View style={[st.mGrid, { marginBottom: 14, flexWrap: "wrap" }]}>
+          {elencoBarbieri.map((b) => {
+            const sel = apBarbieri.includes(b.id);
+            return (
+              <Pressable key={b.id} style={[st.mChip, sel && st.mChipA]} onPress={() => toggleBarbiere(b.id)}>
+                <Text style={[st.mChipText, sel && st.mChipTextA]}>{b.nome}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Interruttore
+          attivo={apAvvisa}
+          onCambia={setApAvvisa}
+          etichetta="Invia comunicazione ai clienti"
+          nota="Avviso dell'apertura a tutti i clienti, in app e via email"
+        />
+
+        <Pressable style={({ pressed }) => [st.titBtnOro, pressed && { opacity: 0.85 }]} onPress={sblocca}>
+          <Ionicons name="lock-open-outline" size={18} color="#0A0A0A" />
+          <Text style={st.titBtnOroText}>Sblocca giorno</Text>
+        </Pressable>
+
+        {aperture.length > 0 && (
+          <>
+            <Text style={[st.mLabel, { marginTop: 22 }]}>GIORNI SBLOCCATI</Text>
+            {aperture.map((a) => (
+              <View key={a.id} style={st.titRiga}>
+                <View style={{ flex: 1 }}>
+                  <Text style={st.titRigaTitolo}>{dataLunga(a.data)} · {a.sede_nome}</Text>
+                  <Text style={st.titRigaSub}>
+                    {a.ora_inizio}–{a.ora_fine} · {a.barbieri.map(nomeBarbiere).join(", ")}
+                  </Text>
+                </View>
+                <Pressable style={st.absBtn} onPress={() => annullaApertura(a)}>
+                  <Text style={st.absBtnText}>Annulla</Text>
+                </Pressable>
+              </View>
+            ))}
+          </>
+        )}
+      </View>
+
+      {/* ═══ COMUNICAZIONI AI CLIENTI ═══ */}
+      <View style={st.titCard}>
+        <View style={st.titCardHead}>
+          <View style={st.titIcona}><Ionicons name="megaphone-outline" size={20} color="#D4AF37" /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.titCardTitle}>Comunicazioni ai clienti</Text>
+            <Text style={st.titCardSub}>Arrivano nella sezione Messaggi dell'app e via email.</Text>
+          </View>
+        </View>
+
+        <Text style={st.mLabel}>DESTINATARI</Text>
+        <View style={[st.mGrid, { marginBottom: 6, flexWrap: "wrap" }]}>
+          <Pressable style={[st.mChip, comSede === null && st.mChipA]} onPress={() => setComSede(null)}>
+            <Text style={[st.mChipText, comSede === null && st.mChipTextA]}>Tutti i clienti</Text>
+          </Pressable>
+          {sedi.map((s) => (
+            <Pressable key={s.id} style={[st.mChip, comSede === s.id && st.mChipA]} onPress={() => setComSede(s.id)}>
+              <Text style={[st.mChipText, comSede === s.id && st.mChipTextA]}>Clienti di {s.nome}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={st.titCardSub}>
+          {nDestinatari === null ? "Calcolo dei destinatari…" : `${nDestinatari} ${nDestinatari === 1 ? "cliente riceverà" : "clienti riceveranno"} il messaggio`}
+        </Text>
+
+        <Text style={[st.mLabel, { marginTop: 14 }]}>TITOLO</Text>
+        <TextInput
+          style={[st.mInput, { marginBottom: 12 }]}
+          value={comTitolo}
+          onChangeText={setComTitolo}
+          placeholder="Es: Sede chiusa per problemi tecnici"
+          placeholderTextColor="#333"
+          selectionColor="#D4AF37"
+          maxLength={120}
+        />
+        <Text style={st.mLabel}>MESSAGGIO</Text>
+        <TextInput
+          style={[st.mInput, st.titTextarea]}
+          value={comTesto}
+          onChangeText={setComTesto}
+          placeholder="Scrivi il messaggio per i clienti…"
+          placeholderTextColor="#333"
+          selectionColor="#D4AF37"
+          multiline
+          maxLength={2000}
+        />
+
+        <Pressable style={({ pressed }) => [st.titBtnOro, pressed && { opacity: 0.85 }]} onPress={inviaComunicazione}>
+          <Ionicons name="send-outline" size={17} color="#0A0A0A" />
+          <Text style={st.titBtnOroText}>Invia comunicazione</Text>
+        </Pressable>
+
+        {storico.length > 0 && (
+          <>
+            <Text style={[st.mLabel, { marginTop: 22 }]}>INVIATE DI RECENTE</Text>
+            {storico.slice(0, 10).map((c) => (
+              <View key={c.id} style={st.titRiga}>
+                <View style={{ flex: 1 }}>
+                  <Text style={st.titRigaTitolo} numberOfLines={1}>{c.titolo}</Text>
+                  <Text style={st.titRigaSub}>
+                    {new Date(c.created_at).toLocaleDateString("it-IT", { day: "numeric", month: "short" })} · {c.destinatari} {c.destinatari === 1 ? "cliente" : "clienti"}
+                    {c.email_inviate > 0 ? ` · ${c.email_inviate} email` : ""}
+                    {c.email_fallite > 0 ? ` · ${c.email_fallite} non consegnate` : ""}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+      </View>
+    </View>
+  );
+}
+
 export default function AdminDashboard() {
   const [token, setToken] = useState("");
   const [utente, setUtente] = useState<any>(null);
@@ -387,7 +692,18 @@ export default function AdminDashboard() {
   const [showCambiaPw, setShowCambiaPw] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [nonLetteAdmin, setNonLetteAdmin] = useState(0);
-  const [activeTab, setActiveTab] = useState<"home" | "mia" | "globale">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "mia" | "globale" | "titolare">("home");
+  const isTitolare = utente?.ruolo === "super_admin";
+  // Aperture straordinarie future (tutte le sedi) e tutti i barbieri: servono all'agenda nei giorni
+  // straordinari (chi è in servizio) e al pannello del titolare
+  const [aperture, setAperture] = useState<Apertura[]>([]);
+  const [elencoBarbieri, setElencoBarbieri] = useState<any[]>([]);
+  // Modale di conferma unico per le azioni del titolare (copre tutto lo schermo)
+  const [conferma, setConferma] = useState<Conferma | null>(null);
+  const [confermaInCorso, setConfermaInCorso] = useState(false);
+  const [confermaErrore, setConfermaErrore] = useState("");
+  const ultimaConferma = useRef<Conferma | null>(null); // testo visibile durante il fade-out
+  if (conferma) ultimaConferma.current = conferma;
   const [appDetail, setAppDetail] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<any>(null);
@@ -430,6 +746,37 @@ export default function AdminDashboard() {
     setToast(m);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2500);
+  };
+
+  const caricaAperture = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/aperture-straordinarie`);
+      const lista = await res.json();
+      if (Array.isArray(lista)) setAperture(lista);
+    } catch {}
+  };
+  const chiediConferma = useCallback((c: Conferma) => {
+    setConfermaErrore("");
+    setConferma(c);
+  }, []);
+  const chiudiConferma = useCallback(() => {
+    if (!confermaInCorso) setConferma(null);
+  }, [confermaInCorso]);
+  const eseguiConferma = async () => {
+    if (!conferma || confermaInCorso) return;
+    setConfermaInCorso(true);
+    setConfermaErrore("");
+    try {
+      const esito = await conferma.azione();
+      setConferma(null);
+      if (esito) msg(esito);
+      caricaBarbieri();
+      caricaPrenotazioni();
+    } catch (e: any) {
+      setConfermaErrore(e?.message || "Errore");
+    } finally {
+      setConfermaInCorso(false);
+    }
   };
 
   useEffect(() => {
@@ -493,6 +840,12 @@ export default function AdminDashboard() {
       setEditNome(u.nome || "");
       const [tutteSedi, tuttiServizi] = await Promise.all([resSedi.json(), resServ.json()]);
       setSedi(tutteSedi);
+      // In background: non rallentano l'apertura della dashboard
+      caricaAperture();
+      fetch(`${BACKEND_URL}/api/admin/barbieri`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+        .then((r) => r.json())
+        .then((l) => { if (Array.isArray(l)) setElencoBarbieri(l); })
+        .catch(() => {});
       if (tutteSedi.length > 0) setSedeCorrente(await sedeDiTurnoOggi(u.barbiere_id, tutteSedi));
       setFiltroBarbiere(null);
       setServizi(tuttiServizi);
@@ -962,10 +1315,20 @@ export default function AdminDashboard() {
     );
   const attivi = prenotazioni.filter((p) => p.stato === "attivo");
 
-  // Griglia: SOLO i barbieri in turno in questa sede nella data selezionata (gli assenti
+  // Apertura straordinaria della sede nella data selezionata (domenica/lunedì sbloccati dal titolare)
+  const aperturaOggi = aperture.find((a) => a.sede_id === sedeCorrente && a.data === dataCorrente) || null;
+  // In un'apertura straordinaria lavorano i barbieri scelti dal titolare (anche di un'altra sede);
+  // negli altri giorni quelli di turno in questa sede secondo la rotazione settimanale
+  const barbieriInServizio = (): any[] => aperturaOggi
+    ? aperturaOggi.barbieri
+        .map((id) => tuttiBarbieri.find((b: any) => b.id === id) || elencoBarbieri.find((b: any) => b.id === id))
+        .filter(Boolean)
+    : tuttiBarbieri.filter((b: any) => lavoraInSede(b, dataCorrente));
+
+  // Griglia: SOLO i barbieri in servizio in questa sede nella data selezionata (gli assenti
   // restano con l'overlay). Un barbiere in rotazione che quel giorno è nell'altra sede non ha colonna.
-  const barbieriGriglia = tuttiBarbieri.length > 0
-    ? tuttiBarbieri.filter((b: any) => lavoraInSede(b, dataCorrente))
+  const barbieriGriglia = tuttiBarbieri.length > 0 || aperturaOggi
+    ? barbieriInServizio()
     : barbieri;
   const barbieriTabella = filtroBarbiere
     ? barbieriGriglia.filter((b: any) => b.id === filtroBarbiere)
@@ -979,16 +1342,21 @@ export default function AdminDashboard() {
   }));
 
   const getOrariGiornata = () => {
-    const dt = new Date(dataCorrente);
-    const giorno = dt.getDay();
-    if (giorno === 0 || giorno === 1) return [];
-    const fasce =
-      giorno === 4
-        ? [[720, 1320]] // Giovedì 12:00-22:00
-        : [
-            [540, 720],
-            [900, 1140],
-          ]; // Altri 9:00-12:00, 15:00-19:00
+    const giorno = giornoSettimana(dataCorrente);
+    let fasce: number[][];
+    if (giorno === 0 || giorno === 1) {
+      // Chiuso, salvo apertura straordinaria di QUESTA data: solo la sua fascia
+      if (!aperturaOggi) return [];
+      fasce = [[minutiDa(aperturaOggi.ora_inizio), minutiDa(aperturaOggi.ora_fine)]];
+    } else {
+      fasce =
+        giorno === 4
+          ? [[720, 1320]] // Giovedì 12:00-22:00
+          : [
+              [540, 720],
+              [900, 1140],
+            ]; // Altri 9:00-12:00, 15:00-19:00
+    }
     const orari: string[] = [];
     for (const fascia of fasce) {
       let t = fascia[0];
@@ -1081,6 +1449,12 @@ export default function AdminDashboard() {
                   <>
                     <Text style={[st.statVal, { textAlign: "center" }]}>{attivi.length}</Text>
                     <Text style={[st.statLbl, { textAlign: "center" }]}>Appuntamenti — {fmtDataLunga(dataCorrente)}</Text>
+                    {aperturaOggi && (
+                      <View style={st.titBadge}>
+                        <Ionicons name="lock-open-outline" size={12} color="#D4AF37" />
+                        <Text style={st.titBadgeText}>Apertura straordinaria {aperturaOggi.ora_inizio}–{aperturaOggi.ora_fine}</Text>
+                      </View>
+                    )}
                   </>
                 )}
               </View>
@@ -1129,11 +1503,7 @@ export default function AdminDashboard() {
             {orariGiornata.length > 0 && (
               <View style={{ marginTop: 16, paddingHorizontal: 16, paddingBottom: 16 }}>
                 {(() => {
-                  const [y, m, d] = dataCorrente.split("-").map(Number);
-                  const dow = new Date(y, m - 1, d).getDay();
-                  const barbieriDelGiorno = tuttiBarbieri.filter(
-                    (b) => Array.isArray(b.giorni_lavoro) && b.giorni_lavoro.includes(dow)
-                  );
+                  const barbieriDelGiorno = barbieriInServizio();
                   return barbieriDelGiorno.map((b) => {
                     const appBarb = attivi.filter((p: any) => p.barbiere_id === b.id);
                     const slotsOccupati = appBarb.reduce(
@@ -1492,6 +1862,22 @@ export default function AdminDashboard() {
             <View style={{ height: 90 }} />
           </>
         )}
+
+        {/* ══════════ AREA TITOLARE (solo super_admin): aperture straordinarie e comunicazioni ══════════ */}
+        {activeTab === "titolare" && isTitolare && (
+          <>
+            <PannelloTitolare
+              sedi={sedi}
+              elencoBarbieri={elencoBarbieri}
+              aperture={aperture}
+              fetchAuth={fetchAuth}
+              msg={msg}
+              onAperture={caricaAperture}
+              chiediConferma={chiediConferma}
+            />
+            <View style={{ height: 110 }} />
+          </>
+        )}
       </ScrollView>
 
       {/* BOTTOM TAB BAR — fissa sul fondo (position absolute) */}
@@ -1511,6 +1897,13 @@ export default function AdminDashboard() {
             <Text style={{ fontSize: 20 }}>📅</Text>
             <Text numberOfLines={1} style={[st.bottomTabLabel, activeTab === "globale" && st.bottomTabLabelA]}>Agenda globale</Text>
           </Pressable>
+          {/* Area del titolare: i barbieri (admin) non vedono questa scheda */}
+          {isTitolare && (
+            <Pressable style={[st.bottomTab, activeTab === "titolare" && st.bottomTabA]} onPress={() => vaiATab("titolare")}>
+              <Ionicons name="ribbon-outline" size={21} color={activeTab === "titolare" ? "#D4AF37" : "#777"} />
+              <Text numberOfLines={1} style={[st.bottomTabLabel, activeTab === "titolare" && st.bottomTabLabelA]}>Titolare</Text>
+            </Pressable>
+          )}
       </View>
 
       {/* MODAL AGGIUNGI — STEP 1: FORM */}
@@ -2244,6 +2637,18 @@ export default function AdminDashboard() {
         </View>
       )}
       <GuidaInstallazione userId={utente?.id?.toString() || ""} />
+
+      {/* Conferme dell'area titolare (sblocco giorno, annullamento, invio comunicazione) */}
+      <ConfermaModale
+        visibile={conferma != null}
+        messaggio={ultimaConferma.current?.messaggio || ""}
+        icona={ultimaConferma.current?.icona}
+        testoConferma={ultimaConferma.current?.testoConferma}
+        inCorso={confermaInCorso}
+        errore={confermaErrore}
+        onAnnulla={chiudiConferma}
+        onConferma={eseguiConferma}
+      />
     </View>
   );
 }

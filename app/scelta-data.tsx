@@ -90,6 +90,19 @@ export default function SceltaData() {
   treSettimane.setDate(oggi.getDate() + 21);
   const dataMassimaString = treSettimane.toISOString().split("T")[0];
 
+  // Aperture straordinarie di questa sede: SINGOLE date di domenica/lunedì sbloccate dal titolare.
+  // Solo quelle diventano cliccabili; tutte le altre domeniche e gli altri lunedì restano chiusi.
+  const [aperture, setAperture] = useState<string[]>([]);
+  useEffect(() => {
+    fetch(`${BACKEND_URL}/api/aperture-straordinarie?sede_id=${sede_id}`)
+      .then((res) => res.json())
+      .then((lista) => { if (Array.isArray(lista)) setAperture(lista.map((a: any) => a.data)); })
+      .catch(() => {});
+  }, [sede_id]);
+  // Un'apertura oltre le 3 settimane resta prenotabile: il calendario arriva fino a lei,
+  // ma dopo le 3 settimane è cliccabile solo quel giorno
+  const dataMassimaCalendario = aperture.reduce((max, d) => (d > max ? d : max), dataMassimaString);
+
   useEffect(() => {
     Animated.timing(headerOpacity, {
       toValue: 1,
@@ -230,17 +243,21 @@ export default function SceltaData() {
 
   const getMarkedDates = () => {
     const marked: any = {};
-    for (let i = 0; i < 80; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
+    const d = new Date();
+    for (let i = 0; i < 400; i++) {
+      const anno = d.getFullYear();
+      const mese = String(d.getMonth() + 1).padStart(2, "0");
+      const gg = String(d.getDate()).padStart(2, "0");
+      const key = `${anno}-${mese}-${gg}`;
+      if (key > dataMassimaCalendario && i >= 80) break;
       const giorno = d.getDay();
-      if (giorno === 0 || giorno === 1) {
-        const anno = d.getFullYear();
-        const mese = String(d.getMonth() + 1).padStart(2, "0");
-        const gg = String(d.getDate()).padStart(2, "0");
-        const key = `${anno}-${mese}-${gg}`;
+      if (aperture.includes(key)) {
+        // Apertura straordinaria: cliccabile, con il punto oro
+        marked[key] = { marked: true, dotColor: "#D4AF37" };
+      } else if (giorno === 0 || giorno === 1 || key > dataMassimaString) {
         marked[key] = { disabled: true, disableTouchEvent: true };
       }
+      d.setDate(d.getDate() + 1);
     }
     if (dataSelezionata)
       marked[dataSelezionata] = {
@@ -283,7 +300,7 @@ export default function SceltaData() {
               initialDate={meseCalendario}
               firstDay={1}
               minDate={dataOggiString}
-              maxDate={dataMassimaString}
+              maxDate={dataMassimaCalendario}
               onDayPress={(day: any) => setDataSelezionata(day.dateString)}
               markedDates={getMarkedDates()}
               theme={{
