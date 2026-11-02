@@ -32,6 +32,11 @@ const IconaEsplora = ({ nome }: { nome: React.ComponentProps<typeof Ionicons>["n
 
 const BACKEND_URL = "https://barberia-backend-bulldog.onrender.com";
 
+// "Oggi" e "domani" secondo il calendario del telefono. toISOString usa l'UTC: in Italia tra mezzanotte
+// e l'1 (le 2 con l'ora legale) dava ancora il giorno prima e il promemoria sbagliava oggi/domani.
+const dataLocale = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 export default function Home() {
   const [sheetVisible, setSheetVisible] = useState(false);
   const [utente, setUtente] = useState<any>(null);
@@ -150,11 +155,11 @@ export default function Home() {
       setNumAppuntamenti(data.filter((a: any) => a.stato === 'attivo').length);
 
       const adesso = new Date();
-      const oggiStr = adesso.toISOString().split("T")[0];
+      const oggiStr = dataLocale(adesso);
       const oraCorrente = adesso.toTimeString().slice(0, 5);
       const domani = new Date(adesso);
       domani.setDate(adesso.getDate() + 1);
-      const domaniStr = domani.toISOString().split("T")[0];
+      const domaniStr = dataLocale(domani);
 
       const trovati = data.filter((a: any) => {
         const appDateStr = new Date(a.data).toISOString().split("T")[0];
@@ -168,15 +173,18 @@ export default function Home() {
       const nonDismissi: any[] = [];
       for (const a of trovati) {
         if (a.stato === 'cancellato') {
-          // Mostra sempre i cancellati (ignorano il dismissed), marca per rilevare il ripristino
+          // Cancellato (assenza del barbiere): mostrato una sola volta per 10 secondi, poi non torna più.
+          // Marca anche per rilevare un eventuale ripristino.
           await AsyncStorage.setItem(`reminder_was_cancelled_${a.id}`, "1");
-          nonDismissi.push(a);
+          const giaVisto = await AsyncStorage.getItem(`reminder_cancellato_visto_${a.id}`);
+          if (!giaVisto) nonDismissi.push(a);
         } else {
-          // Se era cancellato e ora è ripristinato, cancella il dismissed precedente
+          // Se era cancellato e ora è ripristinato, torna a comparire come promemoria normale
           const wasCancelled = await AsyncStorage.getItem(`reminder_was_cancelled_${a.id}`);
           if (wasCancelled) {
             await AsyncStorage.removeItem(`reminder_dismissed_${a.id}`);
             await AsyncStorage.removeItem(`reminder_was_cancelled_${a.id}`);
+            await AsyncStorage.removeItem(`reminder_cancellato_visto_${a.id}`);
           }
           const dismissed = await AsyncStorage.getItem(`reminder_dismissed_${a.id}`);
           if (!dismissed) nonDismissi.push(a);
@@ -190,7 +198,7 @@ export default function Home() {
   // Rimuove ogni appuntamento di oggi esattamente all'orario preciso
   useEffect(() => {
     const adesso = new Date();
-    const oggiStr = adesso.toISOString().split("T")[0];
+    const oggiStr = dataLocale(adesso);
     const timers: ReturnType<typeof setTimeout>[] = [];
 
     appDomani.forEach((a) => {
@@ -208,27 +216,28 @@ export default function Home() {
     return () => timers.forEach(clearTimeout);
   }, [appDomani]);
 
-  // Auto-dismiss popup cancellati dopo 15s con fade-out
+  // Popup di un appuntamento cancellato: visibile esattamente 10 secondi, poi breve dissolvenza,
+  // rimozione dall'interfaccia e memoria "già visto" (non ricompare ai ritorni sulla Home).
+  // Il timer dipende solo dall'appuntamento mostrato: ricaricare la lista non lo fa ripartire.
+  const POPUP_CANCELLATO_MS = 10000;
+  const appMostrato = appDomani[reminderIdx];
+  const cancellatoMostrato = appMostrato?.stato === 'cancellato' ? appMostrato.id : null;
   useEffect(() => {
-    if (appDomani.length === 0) return;
-    const currentApp = appDomani[reminderIdx];
-    if (!currentApp || currentApp.stato !== 'cancellato') {
-      cancelFadeAnim.setValue(1);
-      return;
-    }
     cancelFadeAnim.setValue(1);
+    if (cancellatoMostrato == null) return;
     const timer = setTimeout(() => {
-      Animated.timing(cancelFadeAnim, { toValue: 0, duration: 800, useNativeDriver: true }).start(() => {
+      AsyncStorage.setItem(`reminder_cancellato_visto_${cancellatoMostrato}`, "1").catch(() => {});
+      Animated.timing(cancelFadeAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => {
         cancelFadeAnim.setValue(1);
         setAppDomani((prev) => {
-          const nuovi = prev.filter((x: any) => x.id !== currentApp.id);
+          const nuovi = prev.filter((x: any) => x.id !== cancellatoMostrato);
           setReminderIdx((i) => Math.min(i, Math.max(0, nuovi.length - 1)));
           return nuovi;
         });
       });
-    }, 14200);
+    }, POPUP_CANCELLATO_MS);
     return () => clearTimeout(timer);
-  }, [appDomani, reminderIdx]);
+  }, [cancellatoMostrato]);
 
   useFocusEffect(
     useCallback(() => {
@@ -393,10 +402,10 @@ export default function Home() {
         {appDomani.length > 0 && (() => {
           const app = appDomani[reminderIdx];
           const risingApp = transitioning ? appDomani[pendingIdx.current] : null;
-          const isOggi = new Date(app.data).toISOString().split("T")[0] === new Date().toISOString().split("T")[0];
+          const isOggi = new Date(app.data).toISOString().split("T")[0] === dataLocale(new Date());
           const isCancellato = app.stato === 'cancellato';
           const risingIsOggi = risingApp
-            ? new Date(risingApp.data).toISOString().split("T")[0] === new Date().toISOString().split("T")[0]
+            ? new Date(risingApp.data).toISOString().split("T")[0] === dataLocale(new Date())
             : false;
           const risingIsCancellato = risingApp ? risingApp.stato === 'cancellato' : false;
           const hasPrev = reminderIdx > 0;

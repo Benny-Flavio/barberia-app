@@ -138,7 +138,7 @@ export default function Login() {
           ruolo: data.ruolo,
         }));
       }
-      if (data?.ruolo === "admin" || data?.ruolo === "super_admin") {
+      if (data?.ruolo === "admin" || data?.ruolo === "super_admin" || data?.ruolo === "developer") {
         router.replace("/admin-dashboard" as any);
       } else {
         router.replace("/home" as any);
@@ -217,14 +217,14 @@ export default function Login() {
       }
       setStep("otp_code");
     } else {
-      // admin o super_admin → mostra campo password
+      // staff (admin, super_admin, developer) → mostra campo password
       setStep("password");
     }
 
     setLoading(false);
   };
 
-  // Tab Accedi — step 2 (admin/super_admin): accesso con password
+  // Tab Accedi — step 2 (staff): accesso con password
   const eseguiLogin = async () => {
     if (!password) { setErrore("Inserisci la password"); return; }
     setErrore("");
@@ -486,7 +486,7 @@ export default function Login() {
               </>
             )}
 
-            {/* ── STEP PASSWORD (solo admin/super_admin) ── */}
+            {/* ── STEP PASSWORD (solo staff) ── */}
             {step === "password" && (
               <>
                 <Text style={s.stepTitle}>Accedi</Text>

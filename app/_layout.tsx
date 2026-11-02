@@ -10,10 +10,10 @@ import { supabase } from "../lib/supabase";
 // ── Auth guard + route guard per ruolo (unico punto, vale per tutte le pagine) ──
 // "/"                → login e registrazione: l'unica pagina accessibile senza sessione
 // qualsiasi altra    → serve una sessione valida, altrimenti si torna a "/"
-// "/admin-dashboard" → area staff: solo admin / super_admin
+// "/admin-dashboard" → area staff: admin / super_admin / developer
 // tutto il resto     → area cliente: gli account staff vengono rimandati alla dashboard
 const AREA_STAFF = ["/admin-dashboard"];
-const isStaff = (ruolo: string | null) => ruolo === "admin" || ruolo === "super_admin";
+const isStaff = (ruolo: string | null) => ruolo === "admin" || ruolo === "super_admin" || ruolo === "developer";
 
 // Ruolo dell'utente loggato, letto da profili (stessa fonte del login) e tenuto in memoria per utente
 let ruoloInCache: { userId: string; ruolo: string | null } | null = null;

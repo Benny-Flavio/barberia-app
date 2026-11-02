@@ -333,7 +333,7 @@ function OrarioInline({ value, onChange, marginBottom = 14 }: {
   );
 }
 
-// ── Area del titolare (solo super_admin): aperture straordinarie e comunicazioni ai clienti ──
+// ── Scheda "Titolare" (solo developer): aperture straordinarie e comunicazioni ai clienti ──
 // Le conferme passano dal modale della dashboard (chiediConferma), che copre tutto lo schermo.
 type Conferma = {
   messaggio: string;
@@ -693,7 +693,9 @@ export default function AdminDashboard() {
   const [editMode, setEditMode] = useState(false);
   const [nonLetteAdmin, setNonLetteAdmin] = useState(0);
   const [activeTab, setActiveTab] = useState<"home" | "mia" | "globale" | "titolare">("home");
-  const isTitolare = utente?.ruolo === "super_admin";
+  // Scheda "Titolare" (comunicazioni a tutti i clienti, aperture straordinarie): solo il developer,
+  // stessa regola del backend (soloDeveloper). Il titolare (super_admin) non la vede.
+  const isTitolare = utente?.ruolo === "developer";
   // Aperture straordinarie future (tutte le sedi) e tutti i barbieri: servono all'agenda nei giorni
   // straordinari (chi è in servizio) e al pannello del titolare
   const [aperture, setAperture] = useState<Apertura[]>([]);
@@ -711,9 +713,10 @@ export default function AdminDashboard() {
   const overlayOp = useRef(new Animated.Value(0)).current;
   const headerOp = useRef(new Animated.Value(0)).current;
   // Staff di fiducia: tutti gestiscono gli appuntamenti di tutti. Assenze/permessi invece:
-  // un admin solo i propri, il titolare (super_admin) quelli di tutti (stessa regola del backend).
+  // un admin solo i propri, titolare (super_admin) e developer quelli di tutti (stessa regola del backend).
   const puoGestireAssenze = (barbId: number) =>
-    utente?.ruolo === "super_admin" || (utente?.barbiere_id != null && barbId === utente.barbiere_id);
+    utente?.ruolo === "super_admin" || utente?.ruolo === "developer" ||
+    (utente?.barbiere_id != null && barbId === utente.barbiere_id);
   // Tutti i barbieri della sede (non solo quelli in turno oggi): assenze e permessi si programmano anche
   // per altre date, e se ne possono aggiungere più di uno per barbiere
   const barbieriGestibili = (tuttiBarbieri.length > 0 ? tuttiBarbieri : barbieri).filter((b: any) => puoGestireAssenze(b.id));
@@ -830,7 +833,7 @@ export default function AdminDashboard() {
       // ROUTE GUARD: il ruolo arriva dal backend (profili.ruolo), non da dati salvati nel browser.
       // Chi non è staff non vede nulla della dashboard (resta lo spinner) e torna alla sua home.
       // Le API /api/admin/* rifiutano comunque i clienti con 403 lato server.
-      if (meData?.utente?.ruolo !== "admin" && meData?.utente?.ruolo !== "super_admin") {
+      if (!["admin", "super_admin", "developer"].includes(meData?.utente?.ruolo)) {
         router.replace("/home");
         return;
       }
@@ -1863,7 +1866,7 @@ export default function AdminDashboard() {
           </>
         )}
 
-        {/* ══════════ AREA TITOLARE (solo super_admin): aperture straordinarie e comunicazioni ══════════ */}
+        {/* ══════════ SCHEDA "TITOLARE" (solo developer): aperture straordinarie e comunicazioni ══════════ */}
         {activeTab === "titolare" && isTitolare && (
           <>
             <PannelloTitolare
@@ -1897,7 +1900,7 @@ export default function AdminDashboard() {
             <Text style={{ fontSize: 20 }}>📅</Text>
             <Text numberOfLines={1} style={[st.bottomTabLabel, activeTab === "globale" && st.bottomTabLabelA]}>Agenda globale</Text>
           </Pressable>
-          {/* Area del titolare: i barbieri (admin) non vedono questa scheda */}
+          {/* Solo il developer: titolare e barbieri non vedono questa scheda */}
           {isTitolare && (
             <Pressable style={[st.bottomTab, activeTab === "titolare" && st.bottomTabA]} onPress={() => vaiATab("titolare")}>
               <Ionicons name="ribbon-outline" size={21} color={activeTab === "titolare" ? "#D4AF37" : "#777"} />
