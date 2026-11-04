@@ -43,6 +43,7 @@ const SEDI_INFO = [
   },
 ];
 
+// Orario mostrato se quello salvato (Console Developer → Orari sedi) non si carica
 const ORARI = [
   { giorno: "Lunedì", ore: null },
   { giorno: "Martedì", ore: "9:00 - 19:00" },
@@ -52,6 +53,15 @@ const ORARI = [
   { giorno: "Sabato", ore: "9:00 - 19:00" },
   { giorno: "Domenica", ore: null },
 ];
+const NOMI_GIORNI = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
+// Da /api/orari-sedi (righe di una sede) alle righe da mostrare, da lunedì a domenica
+const orariDaMostrare = (righe: any[]) =>
+  righe.length === 0
+    ? ORARI
+    : [1, 2, 3, 4, 5, 6, 0].map((g) => {
+        const fasce = righe.find((r) => r.giorno_settimana === g)?.fasce || [];
+        return { giorno: NOMI_GIORNI[g], ore: fasce.length ? fasce.map((f: any) => `${f.inizio} - ${f.fine}`).join(" · ") : null };
+      });
 
 // Ricerca dell'indirizzo esatto: sullo smartphone il link universale apre l'app Google Maps
 const linkMaps = (indirizzo: string) =>
@@ -84,6 +94,7 @@ export default function SediInfo() {
   const [barbieri, setBarbieri] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sedeAperta, setSedeAperta] = useState<number | null>(null);
+  const [orari, setOrari] = useState<any[]>([]);
   const headerOp = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -96,6 +107,10 @@ export default function SediInfo() {
   }, []);
 
   const caricaBarbieri = async () => {
+    fetch(`${BACKEND_URL}/api/orari-sedi`)
+      .then((r) => r.json())
+      .then((l) => { if (Array.isArray(l)) setOrari(l); })
+      .catch(() => {});
     try {
       const [b1, b2] = await Promise.all(
         [1, 2].map((id) => fetch(`${BACKEND_URL}/api/barbieri/${id}`).then((r) => r.json())),
@@ -140,6 +155,7 @@ export default function SediInfo() {
                 sede={sede}
                 index={index}
                 barbieri={getBarbieri(sede.id)}
+                orari={orariDaMostrare(orari.filter((o) => o.sede_id === sede.id))}
                 aperta={sedeAperta === sede.id}
                 onToggle={() =>
                   setSedeAperta(sedeAperta === sede.id ? null : sede.id)
@@ -155,7 +171,7 @@ export default function SediInfo() {
   );
 }
 
-function SedeCard({ sede, index, barbieri, aperta, onToggle }: any) {
+function SedeCard({ sede, index, barbieri, orari, aperta, onToggle }: any) {
   const op = useRef(new Animated.Value(0)).current;
   const y = useRef(new Animated.Value(30)).current;
 
@@ -242,7 +258,7 @@ function SedeCard({ sede, index, barbieri, aperta, onToggle }: any) {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={st.detailLabel}>Orari di apertura</Text>
-              {ORARI.map((o) => (
+              {orari.map((o: any) => (
                 <View key={o.giorno} style={st.orarioRiga}>
                   <Text style={o.ore ? st.orarioGiorno : st.orarioChiuso}>{o.giorno}</Text>
                   <Text style={o.ore ? st.orarioOre : st.orarioChiuso}>{o.ore ?? "Chiuso"}</Text>

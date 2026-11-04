@@ -93,10 +93,18 @@ export default function SceltaData() {
   // Aperture straordinarie di questa sede: SINGOLE date di domenica/lunedì sbloccate dal titolare.
   // Solo quelle diventano cliccabili; tutte le altre domeniche e gli altri lunedì restano chiusi.
   const [aperture, setAperture] = useState<string[]>([]);
+  // Giorni della settimana in cui la sede è chiusa secondo l'orario standard (Console Developer → Orari sedi)
+  const [giorniChiusi, setGiorniChiusi] = useState<number[]>([0, 1]);
   useEffect(() => {
     fetch(`${BACKEND_URL}/api/aperture-straordinarie?sede_id=${sede_id}`)
       .then((res) => res.json())
       .then((lista) => { if (Array.isArray(lista)) setAperture(lista.map((a: any) => a.data)); })
+      .catch(() => {});
+    fetch(`${BACKEND_URL}/api/orari-sedi?sede_id=${sede_id}`)
+      .then((res) => res.json())
+      .then((lista) => {
+        if (Array.isArray(lista) && lista.length) setGiorniChiusi(lista.filter((o: any) => o.fasce.length === 0).map((o: any) => o.giorno_settimana));
+      })
       .catch(() => {});
   }, [sede_id]);
   // Un'apertura oltre le 3 settimane resta prenotabile: il calendario arriva fino a lei,
@@ -254,7 +262,7 @@ export default function SceltaData() {
       if (aperture.includes(key)) {
         // Apertura straordinaria: cliccabile, con il punto oro
         marked[key] = { marked: true, dotColor: "#D4AF37" };
-      } else if (giorno === 0 || giorno === 1 || key > dataMassimaString) {
+      } else if (giorniChiusi.includes(giorno) || key > dataMassimaString) {
         marked[key] = { disabled: true, disableTouchEvent: true };
       }
       d.setDate(d.getDate() + 1);

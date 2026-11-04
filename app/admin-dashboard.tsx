@@ -18,6 +18,8 @@ import { SHEET_H, st } from "../styles/adminDashboardStyles";
 import { supabase } from "../lib/supabase";
 import GuidaInstallazione from "../components/GuidaInstallazione";
 import ConfermaModale from "../components/ConfermaModale";
+import ConsoleDeveloper, { Apertura, Conferma } from "../components/ConsoleDeveloper";
+import { CalendarioInline, OrarioInline } from "../components/SelettoriDataOra";
 
 LocaleConfig.locales["it"] = {
   monthNames: [
@@ -107,535 +109,6 @@ const assenzaInSede = (b: any, a: Assenza) => {
 };
 const minutiDa = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
 
-const MESI_IT = ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
-const GIORNI_IT = ["Lu","Ma","Me","Gi","Ve","Sa","Do"];
-
-function CalendarioInline({ value, onChange, min, marginBottom = 14, disabledDow = [] }: {
-  value: string;
-  onChange: (v: string) => void;
-  min?: string;
-  marginBottom?: number;
-  disabledDow?: number[];
-}) {
-  const oggi = new Date();
-  const oggiStr = `${oggi.getFullYear()}-${String(oggi.getMonth()+1).padStart(2,"0")}-${String(oggi.getDate()).padStart(2,"0")}`;
-  const [open, setOpen] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [measuredH, setMeasuredH] = useState(0);
-  const animVal = useRef(new Animated.Value(0)).current;
-  const heightAnim = useRef(new Animated.Value(0)).current;
-  const [viewYear, setViewYear] = useState(() => value ? parseInt(value.split("-")[0]) : oggi.getFullYear());
-  const [viewMonth, setViewMonth] = useState(() => value ? parseInt(value.split("-")[1]) - 1 : oggi.getMonth());
-
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const firstDayMon = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
-
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < firstDayMon; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-  const rows: (number | null)[][] = [];
-  for (let r = 0; r < Math.ceil(cells.length / 7); r++) rows.push(cells.slice(r*7, r*7+7));
-
-  // fallback height se non ancora misurato: header(52) + intestazione giorni(30) + righe(30px cad) + padding(28)
-  const estimatedH = measuredH > 0 ? measuredH : 110 + rows.length * 30;
-
-  const fmtDisplay = (v: string) => { const [y,m,d] = v.split("-"); return `${d}/${m}/${y}`; };
-
-  const prevMonth = () => viewMonth === 0 ? (setViewMonth(11), setViewYear(y => y-1)) : setViewMonth(m => m-1);
-  const nextMonth = () => viewMonth === 11 ? (setViewMonth(0), setViewYear(y => y+1)) : setViewMonth(m => m+1);
-
-  const openCal = () => {
-    setVisible(true);
-    setOpen(true);
-    Animated.parallel([
-      Animated.timing(animVal,   { toValue: 1, duration: 260, useNativeDriver: false }),
-      Animated.timing(heightAnim, { toValue: estimatedH, duration: 260, useNativeDriver: false }),
-    ]).start();
-  };
-
-  const closeCal = () => {
-    setOpen(false);
-    Animated.parallel([
-      Animated.timing(animVal,   { toValue: 0, duration: 260, useNativeDriver: false }),
-      Animated.timing(heightAnim, { toValue: 0, duration: 260, useNativeDriver: false }),
-    ]).start(() => setVisible(false));
-  };
-
-  const selectDay = (day: number) => {
-    const ds = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-    if (min && ds < min) return;
-    if (disabledDow.length > 0 && disabledDow.includes(new Date(ds).getDay())) return;
-    onChange(ds);
-    closeCal();
-  };
-
-  return (
-    <View style={{ marginBottom }}>
-      <Pressable
-        onPress={() => open ? closeCal() : openCal()}
-        style={{ backgroundColor: "#0A0A0A", borderWidth: 1.5, borderColor: open ? "#D4AF37" : "#1A1A1A", borderRadius: 12, paddingVertical: 14, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
-      >
-        <Text style={{ color: value ? "#FFF" : "#444", fontSize: 15 }}>{value ? fmtDisplay(value) : "GG / MM / AAAA"}</Text>
-        <Text style={{ color: open ? "#D4AF37" : "#444", fontSize: 11 }}>{open ? "▲" : "▼"}</Text>
-      </Pressable>
-
-      {/* wrapper che anima l'altezza — impedisce al layout di collassare di scatto */}
-      {visible && (
-        <Animated.View style={{ height: heightAnim, overflow: "hidden", marginTop: 6 }}>
-          <Animated.View
-            onLayout={(e) => { const h = e.nativeEvent.layout.height; if (h > 0) setMeasuredH(h); }}
-            style={{ opacity: animVal, backgroundColor: "#0D0D0D", borderRadius: 14, borderWidth: 1, borderColor: "#1E1E1E", padding: 14 }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
-              <Pressable onPress={prevMonth} style={{ padding: 10 }}>
-                <Text style={{ color: "#666", fontSize: 18, lineHeight: 18 }}>‹</Text>
-              </Pressable>
-              <Text style={{ flex: 1, textAlign: "center", color: "#DDD", fontWeight: "700", fontSize: 13, letterSpacing: 1 }}>
-                {MESI_IT[viewMonth].toUpperCase()} {viewYear}
-              </Text>
-              <Pressable onPress={nextMonth} style={{ padding: 10 }}>
-                <Text style={{ color: "#666", fontSize: 18, lineHeight: 18 }}>›</Text>
-              </Pressable>
-            </View>
-
-            <View style={{ flexDirection: "row", marginBottom: 8 }}>
-              {GIORNI_IT.map(g => (
-                <View key={g} style={{ flex: 1, alignItems: "center" }}>
-                  <Text style={{ color: "#444", fontSize: 11, fontWeight: "700", letterSpacing: 0.5 }}>{g}</Text>
-                </View>
-              ))}
-            </View>
-
-            {rows.map((row, ri) => (
-              <View key={ri} style={{ flexDirection: "row" }}>
-                {Array.from({ length: 7 }, (_, ci) => {
-                  const day = row[ci] ?? null;
-                  if (!day) return <View key={ci} style={{ flex: 1, paddingVertical: 8 }} />;
-                  const ds = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-                  const isSelected = ds === value;
-                  const isOggi = ds === oggiStr;
-                  const isDowDisabled = disabledDow.length > 0 && disabledDow.includes(new Date(ds).getDay());
-                  const isDisabled = !!(min && ds < min) || isDowDisabled;
-                  return (
-                    <Pressable
-                      key={ci}
-                      onPress={() => !isDisabled && selectDay(day)}
-                      style={{ flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 8, backgroundColor: isSelected ? "#D4AF37" : "transparent", opacity: isDisabled ? 0.2 : 1 }}
-                    >
-                      <Text style={{ color: isSelected ? "#000" : isOggi ? "#D4AF37" : "#AAA", fontSize: 13, fontWeight: isSelected || isOggi ? "700" : "400" }}>
-                        {day}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ))}
-          </Animated.View>
-        </Animated.View>
-      )}
-    </View>
-  );
-}
-
-const ORE_DISP = ["07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22"];
-const MIN_DISP = ["00","10","20","30","40","50"];
-
-function OrarioInline({ value, onChange, marginBottom = 14 }: {
-  value: string;
-  onChange: (v: string) => void;
-  marginBottom?: number;
-}) {
-  const [open, setOpen] = useState(false);
-  const [visible, setVisible] = useState(false);
-  const [measuredH, setMeasuredH] = useState(0);
-  const animVal = useRef(new Animated.Value(0)).current;
-  const heightAnim = useRef(new Animated.Value(0)).current;
-
-  const parts = value ? value.split(":") : ["", ""];
-  const selOra = parts[0] || "";
-  const selMin = parts[1]?.slice(0, 2) || "";
-
-  const estimatedH = measuredH > 0 ? measuredH : 240;
-
-  const openSel = () => {
-    setVisible(true);
-    setOpen(true);
-    Animated.parallel([
-      Animated.timing(animVal,    { toValue: 1, duration: 260, useNativeDriver: false }),
-      Animated.timing(heightAnim, { toValue: estimatedH, duration: 260, useNativeDriver: false }),
-    ]).start();
-  };
-
-  const closeSel = () => {
-    setOpen(false);
-    Animated.parallel([
-      Animated.timing(animVal,    { toValue: 0, duration: 260, useNativeDriver: false }),
-      Animated.timing(heightAnim, { toValue: 0, duration: 260, useNativeDriver: false }),
-    ]).start(() => setVisible(false));
-  };
-
-  const pickOra = (ora: string) => {
-    onChange(`${ora}:${selMin || "00"}`);
-  };
-
-  const pickMin = (min: string) => {
-    onChange(`${selOra || "09"}:${min}`);
-    closeSel();
-  };
-
-  return (
-    <View style={{ marginBottom }}>
-      <Pressable
-        onPress={() => open ? closeSel() : openSel()}
-        style={{ backgroundColor: "#0A0A0A", borderWidth: 1.5, borderColor: open ? "#D4AF37" : "#1A1A1A", borderRadius: 12, paddingVertical: 14, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
-      >
-        <Text style={{ color: value ? "#FFF" : "#444", fontSize: 15 }}>{value || "HH : MM"}</Text>
-        <Text style={{ color: open ? "#D4AF37" : "#444", fontSize: 11 }}>{open ? "▲" : "▼"}</Text>
-      </Pressable>
-
-      {visible && (
-        <Animated.View style={{ height: heightAnim, overflow: "hidden", marginTop: 6 }}>
-          <Animated.View
-            onLayout={(e) => { const h = e.nativeEvent.layout.height; if (h > 0) setMeasuredH(h); }}
-            style={{ opacity: animVal, backgroundColor: "#0D0D0D", borderRadius: 14, borderWidth: 1, borderColor: "#1E1E1E", padding: 14 }}
-          >
-            <Text style={{ color: "#444", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, marginBottom: 8 }}>ORA</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
-              {ORE_DISP.map(ora => (
-                <Pressable
-                  key={ora}
-                  onPress={() => pickOra(ora)}
-                  style={{ paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, backgroundColor: selOra === ora ? "#D4AF37" : "#141414", minWidth: 40, alignItems: "center" }}
-                >
-                  <Text style={{ color: selOra === ora ? "#000" : "#AAA", fontSize: 13, fontWeight: selOra === ora ? "700" : "400" }}>{ora}</Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View style={{ height: 1, backgroundColor: "#1E1E1E", marginBottom: 12 }} />
-
-            <Text style={{ color: "#444", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, marginBottom: 8 }}>MINUTI</Text>
-            <View style={{ flexDirection: "row", gap: 6 }}>
-              {MIN_DISP.map(min => (
-                <Pressable
-                  key={min}
-                  onPress={() => pickMin(min)}
-                  style={{ flex: 1, paddingVertical: 7, borderRadius: 8, backgroundColor: selMin === min ? "#D4AF37" : "#141414", alignItems: "center" }}
-                >
-                  <Text style={{ color: selMin === min ? "#000" : "#AAA", fontSize: 13, fontWeight: selMin === min ? "700" : "400" }}>:{min}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </Animated.View>
-        </Animated.View>
-      )}
-    </View>
-  );
-}
-
-// ── Scheda "Titolare" (solo developer): aperture straordinarie e comunicazioni ai clienti ──
-// Le conferme passano dal modale della dashboard (chiediConferma), che copre tutto lo schermo.
-type Conferma = {
-  messaggio: string;
-  icona: React.ComponentProps<typeof Ionicons>["name"];
-  testoConferma: string;
-  azione: () => Promise<string | void>; // restituisce il messaggio da mostrare, lancia in caso di errore
-};
-type Apertura = { id: number; data: string; sede_id: number; sede_nome: string; ora_inizio: string; ora_fine: string; barbieri: number[] };
-
-const GIORNI_LUNGHI = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
-// "2026-12-20" → "Domenica 20 Dicembre"
-const dataLunga = (iso: string) => {
-  const [y, m, d] = iso.split("-").map(Number);
-  return `${GIORNI_LUNGHI[new Date(y, m - 1, d).getDay()]} ${d} ${MESI_IT[m - 1]}`;
-};
-
-function Interruttore({ attivo, onCambia, etichetta, nota }: { attivo: boolean; onCambia: (v: boolean) => void; etichetta: string; nota?: string }) {
-  return (
-    <Pressable style={st.titToggleRow} onPress={() => onCambia(!attivo)}>
-      <View style={{ flex: 1 }}>
-        <Text style={st.titToggleLabel}>{etichetta}</Text>
-        {nota ? <Text style={st.titToggleNota}>{nota}</Text> : null}
-      </View>
-      <View style={[st.titToggleTrack, attivo && st.titToggleTrackOn]}>
-        <View style={[st.titToggleKnob, attivo && st.titToggleKnobOn]} />
-      </View>
-    </Pressable>
-  );
-}
-
-function PannelloTitolare({ sedi, elencoBarbieri, aperture, fetchAuth, msg, onAperture, chiediConferma }: {
-  sedi: any[];
-  elencoBarbieri: any[];
-  aperture: Apertura[];
-  fetchAuth: (url: string, options?: RequestInit) => Promise<Response>;
-  msg: (m: string) => void;
-  onAperture: () => void;
-  chiediConferma: (c: Conferma) => void;
-}) {
-  const oggi = new Date();
-  const oggiStr = `${oggi.getFullYear()}-${String(oggi.getMonth() + 1).padStart(2, "0")}-${String(oggi.getDate()).padStart(2, "0")}`;
-  const sedeNome = (id: number) => sedi.find((s) => s.id === id)?.nome || "";
-  const nomeBarbiere = (id: number) => elencoBarbieri.find((b) => b.id === id)?.nome || `#${id}`;
-
-  // ── Apertura straordinaria: UNA data (domenica o lunedì) per UNA sede ──
-  const [apSede, setApSede] = useState<number>(sedi[0]?.id ?? 0);
-  const [apData, setApData] = useState("");
-  const [apInizio, setApInizio] = useState("10:00");
-  const [apFine, setApFine] = useState("18:00");
-  const [apBarbieri, setApBarbieri] = useState<number[]>([]);
-  const [apAvvisa, setApAvvisa] = useState(true);
-  // Barbieri preselezionati: quelli che di solito lavorano nella sede scelta
-  useEffect(() => {
-    if (!apSede) return;
-    fetch(`${BACKEND_URL}/api/barbieri/${apSede}`)
-      .then((r) => r.json())
-      .then((l) => { if (Array.isArray(l)) setApBarbieri(l.map((b: any) => b.id)); })
-      .catch(() => {});
-  }, [apSede]);
-  const toggleBarbiere = (id: number) =>
-    setApBarbieri((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-
-  const sblocca = () => {
-    if (!apData) return msg("Scegli la data da sbloccare");
-    if (minutiDa(apFine) - minutiDa(apInizio) < 40) return msg("L'apertura deve durare almeno 40 minuti");
-    if (apBarbieri.length === 0) return msg("Seleziona almeno un barbiere");
-    chiediConferma({
-      icona: "lock-open-outline",
-      testoConferma: "Sì, sblocca",
-      messaggio: `Sbloccare solo ${dataLunga(apData)} a ${sedeNome(apSede)}, dalle ${apInizio} alle ${apFine}?`
-        + (apAvvisa ? "\n\nTutti i clienti riceveranno l'avviso in app e via email." : ""),
-      azione: async () => {
-        const res = await fetchAuth(`${BACKEND_URL}/api/admin/aperture-straordinarie`, {
-          method: "POST",
-          body: JSON.stringify({ data: apData, sede_id: apSede, ora_inizio: apInizio, ora_fine: apFine, barbieri: apBarbieri, notifica_clienti: apAvvisa }),
-        });
-        const d = await res.json();
-        if (!res.ok) throw new Error(d.error || "Errore");
-        setApData("");
-        onAperture();
-        if (apAvvisa) caricaStorico();
-        return d.messaggio;
-      },
-    });
-  };
-
-  const annullaApertura = (a: Apertura) =>
-    chiediConferma({
-      icona: "close-circle-outline",
-      testoConferma: "Sì, annulla",
-      messaggio: `Annullare l'apertura straordinaria di ${dataLunga(a.data)} a ${a.sede_nome}?\n\nGli appuntamenti già presi verranno cancellati e i clienti avvisati.`,
-      azione: async () => {
-        const res = await fetchAuth(`${BACKEND_URL}/api/admin/aperture-straordinarie/${a.id}`, { method: "DELETE" });
-        const d = await res.json();
-        if (!res.ok) throw new Error(d.error || "Errore");
-        onAperture();
-        return d.messaggio;
-      },
-    });
-
-  // ── Comunicazioni ai clienti ──
-  const [comTitolo, setComTitolo] = useState("");
-  const [comTesto, setComTesto] = useState("");
-  const [comSede, setComSede] = useState<number | null>(null); // null = tutti i clienti
-  const [nDestinatari, setNDestinatari] = useState<number | null>(null);
-  const [emailAttiva, setEmailAttiva] = useState(false);
-  const [storico, setStorico] = useState<any[]>([]);
-
-  const caricaStorico = async () => {
-    try {
-      const res = await fetchAuth(`${BACKEND_URL}/api/admin/comunicazioni`);
-      const d = await res.json();
-      if (Array.isArray(d)) setStorico(d);
-    } catch {}
-  };
-  useEffect(() => { caricaStorico(); }, []);
-  // Anteprima del numero di destinatari a ogni cambio di filtro
-  useEffect(() => {
-    setNDestinatari(null);
-    fetchAuth(`${BACKEND_URL}/api/admin/comunicazioni`, { method: "POST", body: JSON.stringify({ anteprima: true, sede_id: comSede }) })
-      .then((r) => r.json())
-      .then((d) => { if (d.anteprima) { setNDestinatari(d.destinatari); setEmailAttiva(!!d.email); } })
-      .catch(() => {});
-  }, [comSede]);
-
-  const inviaComunicazione = () => {
-    if (!comTitolo.trim()) return msg("Inserisci il titolo");
-    if (!comTesto.trim()) return msg("Scrivi il messaggio");
-    if (!nDestinatari) return msg("Nessun cliente destinatario");
-    chiediConferma({
-      icona: "megaphone-outline",
-      testoConferma: "Sì, invia",
-      messaggio: `Inviare «${comTitolo.trim()}» a ${nDestinatari} ${nDestinatari === 1 ? "cliente" : "clienti"}?`
-        + (emailAttiva ? "\n\nLo riceveranno in app e via email." : "\n\nLo riceveranno in app (email non ancora configurata)."),
-      azione: async () => {
-        const res = await fetchAuth(`${BACKEND_URL}/api/admin/comunicazioni`, {
-          method: "POST",
-          body: JSON.stringify({ titolo: comTitolo.trim(), messaggio: comTesto.trim(), sede_id: comSede }),
-        });
-        const d = await res.json();
-        if (!res.ok) throw new Error(d.error || "Errore");
-        setComTitolo("");
-        setComTesto("");
-        caricaStorico();
-        return d.messaggio;
-      },
-    });
-  };
-
-  return (
-    <View style={st.titWrap}>
-      {/* ═══ APERTURE STRAORDINARIE ═══ */}
-      <View style={st.titCard}>
-        <View style={st.titCardHead}>
-          <View style={st.titIcona}><Ionicons name="calendar-outline" size={20} color="#D4AF37" /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={st.titCardTitle}>Apertura straordinaria</Text>
-            <Text style={st.titCardSub}>Sblocca un singolo giorno di chiusura (domenica o lunedì). Tutti gli altri restano chiusi.</Text>
-          </View>
-        </View>
-
-        <Text style={st.mLabel}>SEDE</Text>
-        <View style={[st.mGrid, { marginBottom: 14 }]}>
-          {sedi.map((s) => (
-            <Pressable key={s.id} style={[st.mChip, { flex: 1, alignItems: "center" }, apSede === s.id && st.mChipA]} onPress={() => setApSede(s.id)}>
-              <Text style={[st.mChipText, apSede === s.id && st.mChipTextA]}>{s.nome}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Text style={st.mLabel}>DATA (SOLO DOMENICA O LUNEDÌ)</Text>
-        <CalendarioInline value={apData} onChange={setApData} min={oggiStr} disabledDow={[2, 3, 4, 5, 6]} />
-
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={st.mLabel}>DALLE</Text>
-            <OrarioInline value={apInizio} onChange={setApInizio} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={st.mLabel}>ALLE</Text>
-            <OrarioInline value={apFine} onChange={setApFine} />
-          </View>
-        </View>
-
-        <Text style={st.mLabel}>BARBIERI IN SERVIZIO</Text>
-        <View style={[st.mGrid, { marginBottom: 14, flexWrap: "wrap" }]}>
-          {elencoBarbieri.map((b) => {
-            const sel = apBarbieri.includes(b.id);
-            return (
-              <Pressable key={b.id} style={[st.mChip, sel && st.mChipA]} onPress={() => toggleBarbiere(b.id)}>
-                <Text style={[st.mChipText, sel && st.mChipTextA]}>{b.nome}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Interruttore
-          attivo={apAvvisa}
-          onCambia={setApAvvisa}
-          etichetta="Invia comunicazione ai clienti"
-          nota="Avviso dell'apertura a tutti i clienti, in app e via email"
-        />
-
-        <Pressable style={({ pressed }) => [st.titBtnOro, pressed && { opacity: 0.85 }]} onPress={sblocca}>
-          <Ionicons name="lock-open-outline" size={18} color="#0A0A0A" />
-          <Text style={st.titBtnOroText}>Sblocca giorno</Text>
-        </Pressable>
-
-        {aperture.length > 0 && (
-          <>
-            <Text style={[st.mLabel, { marginTop: 22 }]}>GIORNI SBLOCCATI</Text>
-            {aperture.map((a) => (
-              <View key={a.id} style={st.titRiga}>
-                <View style={{ flex: 1 }}>
-                  <Text style={st.titRigaTitolo}>{dataLunga(a.data)} · {a.sede_nome}</Text>
-                  <Text style={st.titRigaSub}>
-                    {a.ora_inizio}–{a.ora_fine} · {a.barbieri.map(nomeBarbiere).join(", ")}
-                  </Text>
-                </View>
-                <Pressable style={st.absBtn} onPress={() => annullaApertura(a)}>
-                  <Text style={st.absBtnText}>Annulla</Text>
-                </Pressable>
-              </View>
-            ))}
-          </>
-        )}
-      </View>
-
-      {/* ═══ COMUNICAZIONI AI CLIENTI ═══ */}
-      <View style={st.titCard}>
-        <View style={st.titCardHead}>
-          <View style={st.titIcona}><Ionicons name="megaphone-outline" size={20} color="#D4AF37" /></View>
-          <View style={{ flex: 1 }}>
-            <Text style={st.titCardTitle}>Comunicazioni ai clienti</Text>
-            <Text style={st.titCardSub}>Arrivano nella sezione Messaggi dell'app e via email.</Text>
-          </View>
-        </View>
-
-        <Text style={st.mLabel}>DESTINATARI</Text>
-        <View style={[st.mGrid, { marginBottom: 6, flexWrap: "wrap" }]}>
-          <Pressable style={[st.mChip, comSede === null && st.mChipA]} onPress={() => setComSede(null)}>
-            <Text style={[st.mChipText, comSede === null && st.mChipTextA]}>Tutti i clienti</Text>
-          </Pressable>
-          {sedi.map((s) => (
-            <Pressable key={s.id} style={[st.mChip, comSede === s.id && st.mChipA]} onPress={() => setComSede(s.id)}>
-              <Text style={[st.mChipText, comSede === s.id && st.mChipTextA]}>Clienti di {s.nome}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={st.titCardSub}>
-          {nDestinatari === null ? "Calcolo dei destinatari…" : `${nDestinatari} ${nDestinatari === 1 ? "cliente riceverà" : "clienti riceveranno"} il messaggio`}
-        </Text>
-
-        <Text style={[st.mLabel, { marginTop: 14 }]}>TITOLO</Text>
-        <TextInput
-          style={[st.mInput, { marginBottom: 12 }]}
-          value={comTitolo}
-          onChangeText={setComTitolo}
-          placeholder="Es: Sede chiusa per problemi tecnici"
-          placeholderTextColor="#333"
-          selectionColor="#D4AF37"
-          maxLength={120}
-        />
-        <Text style={st.mLabel}>MESSAGGIO</Text>
-        <TextInput
-          style={[st.mInput, st.titTextarea]}
-          value={comTesto}
-          onChangeText={setComTesto}
-          placeholder="Scrivi il messaggio per i clienti…"
-          placeholderTextColor="#333"
-          selectionColor="#D4AF37"
-          multiline
-          maxLength={2000}
-        />
-
-        <Pressable style={({ pressed }) => [st.titBtnOro, pressed && { opacity: 0.85 }]} onPress={inviaComunicazione}>
-          <Ionicons name="send-outline" size={17} color="#0A0A0A" />
-          <Text style={st.titBtnOroText}>Invia comunicazione</Text>
-        </Pressable>
-
-        {storico.length > 0 && (
-          <>
-            <Text style={[st.mLabel, { marginTop: 22 }]}>INVIATE DI RECENTE</Text>
-            {storico.slice(0, 10).map((c) => (
-              <View key={c.id} style={st.titRiga}>
-                <View style={{ flex: 1 }}>
-                  <Text style={st.titRigaTitolo} numberOfLines={1}>{c.titolo}</Text>
-                  <Text style={st.titRigaSub}>
-                    {new Date(c.created_at).toLocaleDateString("it-IT", { day: "numeric", month: "short" })} · {c.destinatari} {c.destinatari === 1 ? "cliente" : "clienti"}
-                    {c.email_inviate > 0 ? ` · ${c.email_inviate} email` : ""}
-                    {c.email_fallite > 0 ? ` · ${c.email_fallite} non consegnate` : ""}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </>
-        )}
-      </View>
-    </View>
-  );
-}
-
 export default function AdminDashboard() {
   const [token, setToken] = useState("");
   const [utente, setUtente] = useState<any>(null);
@@ -692,10 +165,12 @@ export default function AdminDashboard() {
   const [showCambiaPw, setShowCambiaPw] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [nonLetteAdmin, setNonLetteAdmin] = useState(0);
-  const [activeTab, setActiveTab] = useState<"home" | "mia" | "globale" | "titolare">("home");
-  // Scheda "Titolare" (comunicazioni a tutti i clienti, aperture straordinarie): solo il developer,
-  // stessa regola del backend (soloDeveloper). Il titolare (super_admin) non la vede.
-  const isTitolare = utente?.ruolo === "developer";
+  const [activeTab, setActiveTab] = useState<"home" | "mia" | "globale" | "console">("home");
+  // Il developer vede SOLO la Console Developer (niente Home, agenda e sedi): è un'area di
+  // amministrazione, non operativa. Stessa regola del backend (soloDeveloper).
+  const isDeveloper = utente?.ruolo === "developer";
+  // Orario standard delle sedi (tabella orari_sedi): griglia dell'agenda e giorni di chiusura
+  const [orariSedi, setOrariSedi] = useState<{ sede_id: number; giorno_settimana: number; fasce: { inizio: string; fine: string }[] }[]>([]);
   // Aperture straordinarie future (tutte le sedi) e tutti i barbieri: servono all'agenda nei giorni
   // straordinari (chi è in servizio) e al pannello del titolare
   const [aperture, setAperture] = useState<Apertura[]>([]);
@@ -841,15 +316,22 @@ export default function AdminDashboard() {
       setToken(session.access_token);
       setUtente(u);
       setEditNome(u.nome || "");
+      const developer = u.ruolo === "developer";
+      if (developer) setActiveTab("console"); // pagina di atterraggio del developer
       const [tutteSedi, tuttiServizi] = await Promise.all([resSedi.json(), resServ.json()]);
       setSedi(tutteSedi);
       // In background: non rallentano l'apertura della dashboard
       caricaAperture();
+      fetch(`${BACKEND_URL}/api/orari-sedi`)
+        .then((r) => r.json())
+        .then((l) => { if (Array.isArray(l)) setOrariSedi(l); })
+        .catch(() => {});
       fetch(`${BACKEND_URL}/api/admin/barbieri`, { headers: { Authorization: `Bearer ${session.access_token}` } })
         .then((r) => r.json())
         .then((l) => { if (Array.isArray(l)) setElencoBarbieri(l); })
         .catch(() => {});
-      if (tutteSedi.length > 0) setSedeCorrente(await sedeDiTurnoOggi(u.barbiere_id, tutteSedi));
+      // Il developer non ha agenda: nessuna sede selezionata, quindi niente appuntamenti caricati
+      if (tutteSedi.length > 0 && !developer) setSedeCorrente(await sedeDiTurnoOggi(u.barbiere_id, tutteSedi));
       setFiltroBarbiere(null);
       setServizi(tuttiServizi);
       setLoading(false);
@@ -1347,18 +829,18 @@ export default function AdminDashboard() {
   const getOrariGiornata = () => {
     const giorno = giornoSettimana(dataCorrente);
     let fasce: number[][];
-    if (giorno === 0 || giorno === 1) {
-      // Chiuso, salvo apertura straordinaria di QUESTA data: solo la sua fascia
-      if (!aperturaOggi) return [];
+    if (aperturaOggi) {
+      // Apertura straordinaria di QUESTA data: solo la sua fascia
       fasce = [[minutiDa(aperturaOggi.ora_inizio), minutiDa(aperturaOggi.ora_fine)]];
+    } else if (orariSedi.length > 0) {
+      // Orario standard della sede (Console Developer → Orari sedi); nessuna fascia = chiuso
+      fasce = (orariSedi.find((o) => o.sede_id === sedeCorrente && o.giorno_settimana === giorno)?.fasce || [])
+        .map((f) => [minutiDa(f.inizio), minutiDa(f.fine)]);
+      if (fasce.length === 0) return [];
     } else {
-      fasce =
-        giorno === 4
-          ? [[720, 1320]] // Giovedì 12:00-22:00
-          : [
-              [540, 720],
-              [900, 1140],
-            ]; // Altri 9:00-12:00, 15:00-19:00
+      // Orari non ancora caricati: orario standard storico (evita un falso "giorno di chiusura")
+      if (giorno === 0 || giorno === 1) return [];
+      fasce = giorno === 4 ? [[720, 1320]] : [[540, 720], [900, 1140]];
     }
     const orari: string[] = [];
     for (const fascia of fasce) {
@@ -1397,7 +879,7 @@ export default function AdminDashboard() {
       {/* HEADER */}
       <Animated.View style={[st.header, { opacity: headerOp }]}>
         <View>
-          <Text style={st.headerLabel}>STAFF</Text>
+          <Text style={st.headerLabel}>{isDeveloper ? "DEVELOPER" : "STAFF"}</Text>
           <Text style={st.headerBrand}>BULLDOG BARBER SHOP</Text>
           <Text style={st.headerUser}>💈 {utente?.nome}</Text>
         </View>
@@ -1416,7 +898,8 @@ export default function AdminDashboard() {
         </View>
       </Animated.View>
 
-      {/* SEDE TABS — sempre visibili */}
+      {/* SEDE TABS — per l'agenda (il developer non ne ha) */}
+      {!isDeveloper && (
       <View style={st.sedeRow}>
         {sedi.map((sede) => (
           <Pressable
@@ -1430,11 +913,12 @@ export default function AdminDashboard() {
           </Pressable>
         ))}
       </View>
+      )}
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} bounces={false}>
 
         {/* ══════════ HOME TAB ══════════ */}
-        {activeTab === "home" && (
+        {activeTab === "home" && !isDeveloper && (
           <>
             {/* Riquadro appuntamenti con navigazione giorni ai lati */}
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%", paddingHorizontal: 4 }}>
@@ -1559,7 +1043,7 @@ export default function AdminDashboard() {
         )}
 
         {/* ══════════ AGENDA: "La mia agenda" (filtrata sul barbiere loggato) / "Agenda globale" ══════════ */}
-        {(activeTab === "mia" || activeTab === "globale") && (
+        {(activeTab === "mia" || activeTab === "globale") && !isDeveloper && (
           <>
             <Text style={{ color: "#D4AF37", fontSize: 12, fontWeight: "700", letterSpacing: 1.5, textAlign: "center", marginTop: 14 }}>
               {activeTab === "mia" ? `📋 LA MIA AGENDA — ${utente?.nome || ""}` : "👥 AGENDA GLOBALE"}
@@ -1866,10 +1350,10 @@ export default function AdminDashboard() {
           </>
         )}
 
-        {/* ══════════ SCHEDA "TITOLARE" (solo developer): aperture straordinarie e comunicazioni ══════════ */}
-        {activeTab === "titolare" && isTitolare && (
+        {/* ══════════ CONSOLE DEVELOPER (unica area visibile al developer) ══════════ */}
+        {isDeveloper && (
           <>
-            <PannelloTitolare
+            <ConsoleDeveloper
               sedi={sedi}
               elencoBarbieri={elencoBarbieri}
               aperture={aperture}
@@ -1878,12 +1362,13 @@ export default function AdminDashboard() {
               onAperture={caricaAperture}
               chiediConferma={chiediConferma}
             />
-            <View style={{ height: 110 }} />
+            <View style={{ height: 40 }} />
           </>
         )}
       </ScrollView>
 
-      {/* BOTTOM TAB BAR — fissa sul fondo (position absolute) */}
+      {/* BOTTOM TAB BAR — fissa sul fondo (position absolute). Il developer non ha schede operative */}
+      {!isDeveloper && (
       <View style={st.bottomBar}>
           <Pressable style={[st.bottomTab, activeTab === "home" && st.bottomTabA]} onPress={() => vaiATab("home")}>
             <Text style={{ fontSize: 20 }}>🏠</Text>
@@ -1900,14 +1385,8 @@ export default function AdminDashboard() {
             <Text style={{ fontSize: 20 }}>📅</Text>
             <Text numberOfLines={1} style={[st.bottomTabLabel, activeTab === "globale" && st.bottomTabLabelA]}>Agenda globale</Text>
           </Pressable>
-          {/* Solo il developer: titolare e barbieri non vedono questa scheda */}
-          {isTitolare && (
-            <Pressable style={[st.bottomTab, activeTab === "titolare" && st.bottomTabA]} onPress={() => vaiATab("titolare")}>
-              <Ionicons name="ribbon-outline" size={21} color={activeTab === "titolare" ? "#D4AF37" : "#777"} />
-              <Text numberOfLines={1} style={[st.bottomTabLabel, activeTab === "titolare" && st.bottomTabLabelA]}>Titolare</Text>
-            </Pressable>
-          )}
       </View>
+      )}
 
       {/* MODAL AGGIUNGI — STEP 1: FORM */}
       {showAggiungi && modalStep === "form" && (
