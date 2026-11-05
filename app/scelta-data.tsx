@@ -93,18 +93,22 @@ export default function SceltaData() {
   // Aperture straordinarie di questa sede: SINGOLE date di domenica/lunedì sbloccate dal titolare.
   // Solo quelle diventano cliccabili; tutte le altre domeniche e gli altri lunedì restano chiusi.
   const [aperture, setAperture] = useState<string[]>([]);
-  // Giorni della settimana in cui la sede è chiusa secondo l'orario standard (Console Developer → Orari sedi)
-  const [giorniChiusi, setGiorniChiusi] = useState<number[]>([0, 1]);
+  // Orario della sede in vigore e programmato (Console Developer → Orari sedi): in una data vale la
+  // versione con il valido_dal più recente <= data. Finché non arriva: chiuso domenica e lunedì.
+  const [versioniOrari, setVersioniOrari] = useState<{ valido_dal: string; giorni: { giorno_settimana: number; fasce: any[] }[] }[]>([]);
+  const chiusoIl = (data: string, giorno: number) => {
+    if (versioniOrari.length === 0) return giorno === 0 || giorno === 1;
+    const versione = versioniOrari.filter((v) => v.valido_dal <= data).pop() || versioniOrari[0];
+    return (versione.giorni.find((g) => g.giorno_settimana === giorno)?.fasce.length ?? 0) === 0;
+  };
   useEffect(() => {
     fetch(`${BACKEND_URL}/api/aperture-straordinarie?sede_id=${sede_id}`)
       .then((res) => res.json())
       .then((lista) => { if (Array.isArray(lista)) setAperture(lista.map((a: any) => a.data)); })
       .catch(() => {});
-    fetch(`${BACKEND_URL}/api/orari-sedi?sede_id=${sede_id}`)
+    fetch(`${BACKEND_URL}/api/orari-sedi/versioni?sede_id=${sede_id}`)
       .then((res) => res.json())
-      .then((lista) => {
-        if (Array.isArray(lista) && lista.length) setGiorniChiusi(lista.filter((o: any) => o.fasce.length === 0).map((o: any) => o.giorno_settimana));
-      })
+      .then((lista) => { if (Array.isArray(lista) && lista.length) setVersioniOrari(lista); })
       .catch(() => {});
   }, [sede_id]);
   // Un'apertura oltre le 3 settimane resta prenotabile: il calendario arriva fino a lei,
@@ -262,7 +266,7 @@ export default function SceltaData() {
       if (aperture.includes(key)) {
         // Apertura straordinaria: cliccabile, con il punto oro
         marked[key] = { marked: true, dotColor: "#D4AF37" };
-      } else if (giorniChiusi.includes(giorno) || key > dataMassimaString) {
+      } else if (chiusoIl(key, giorno) || key > dataMassimaString) {
         marked[key] = { disabled: true, disableTouchEvent: true };
       }
       d.setDate(d.getDate() + 1);

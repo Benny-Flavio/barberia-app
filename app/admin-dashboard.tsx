@@ -170,7 +170,8 @@ export default function AdminDashboard() {
   // amministrazione, non operativa. Stessa regola del backend (soloDeveloper).
   const isDeveloper = utente?.ruolo === "developer";
   // Orario standard delle sedi (tabella orari_sedi): griglia dell'agenda e giorni di chiusura
-  const [orariSedi, setOrariSedi] = useState<{ sede_id: number; giorno_settimana: number; fasce: { inizio: string; fine: string }[] }[]>([]);
+  // Versioni dell'orario (in vigore + programmate): in una data vale quella con il valido_dal più recente <= data
+  const [orariVersioni, setOrariVersioni] = useState<{ sede_id: number; valido_dal: string; giorni: { giorno_settimana: number; fasce: { inizio: string; fine: string }[] }[] }[]>([]);
   // Aperture straordinarie future (tutte le sedi) e tutti i barbieri: servono all'agenda nei giorni
   // straordinari (chi è in servizio) e al pannello del titolare
   const [aperture, setAperture] = useState<Apertura[]>([]);
@@ -322,9 +323,9 @@ export default function AdminDashboard() {
       setSedi(tutteSedi);
       // In background: non rallentano l'apertura della dashboard
       caricaAperture();
-      fetch(`${BACKEND_URL}/api/orari-sedi`)
+      fetch(`${BACKEND_URL}/api/orari-sedi/versioni`)
         .then((r) => r.json())
-        .then((l) => { if (Array.isArray(l)) setOrariSedi(l); })
+        .then((l) => { if (Array.isArray(l)) setOrariVersioni(l); })
         .catch(() => {});
       fetch(`${BACKEND_URL}/api/admin/barbieri`, { headers: { Authorization: `Bearer ${session.access_token}` } })
         .then((r) => r.json())
@@ -353,7 +354,8 @@ export default function AdminDashboard() {
       // Barbieri in turno e barbieri della sede (con assenze) in PARALLELO
       const [res, resAll] = await Promise.all([
         fetch(`${BACKEND_URL}/api/barbieri-disponibili?sede_id=${sedeCorrente}&data=${dataCorrente}`),
-        fetchAuth(`${BACKEND_URL}/api/admin/barbieri?sede_id=${sedeCorrente}`),
+        // giorni_lavoro secondo i turni in vigore nella data dell'agenda (anche quelli programmati)
+        fetchAuth(`${BACKEND_URL}/api/admin/barbieri?sede_id=${sedeCorrente}&data=${dataCorrente}`),
       ]);
       const [data, allBarb] = await Promise.all([res.json(), resAll.json()]);
       const lista = Array.isArray(data) ? data : data.barbieri || [];
@@ -832,9 +834,11 @@ export default function AdminDashboard() {
     if (aperturaOggi) {
       // Apertura straordinaria di QUESTA data: solo la sua fascia
       fasce = [[minutiDa(aperturaOggi.ora_inizio), minutiDa(aperturaOggi.ora_fine)]];
-    } else if (orariSedi.length > 0) {
-      // Orario standard della sede (Console Developer → Orari sedi); nessuna fascia = chiuso
-      fasce = (orariSedi.find((o) => o.sede_id === sedeCorrente && o.giorno_settimana === giorno)?.fasce || [])
+    } else if (orariVersioni.length > 0) {
+      // Orario della sede in vigore in QUESTA data (Console Developer → Orari sedi); nessuna fascia = chiuso
+      const delleSede = orariVersioni.filter((v) => v.sede_id === sedeCorrente);
+      const versione = delleSede.filter((v) => v.valido_dal <= dataCorrente).pop() || delleSede[0];
+      fasce = (versione?.giorni.find((x) => x.giorno_settimana === giorno)?.fasce || [])
         .map((f) => [minutiDa(f.inizio), minutiDa(f.fine)]);
       if (fasce.length === 0) return [];
     } else {

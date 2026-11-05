@@ -10,7 +10,8 @@ const minutiDa = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number);
 
 // ── Console Developer (solo ruolo developer) ──
 // Area di amministrazione separata dall'agenda dei barbieri: comunicazioni ai clienti, aperture
-// straordinarie, orari delle sedi, turni dello staff e archivio delle operazioni con report mensile.
+// straordinarie, orari delle sedi e turni dello staff (programmabili da una data futura) e archivio
+// delle operazioni con report mensile in PDF.
 // Le conferme passano dal modale della dashboard (chiediConferma), che copre tutto lo schermo.
 export type Conferma = {
   messaggio: string;
@@ -34,15 +35,15 @@ type Props = {
 
 const GIORNI_LUNGHI = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
 const ORDINE_SETTIMANA = [1, 2, 3, 4, 5, 6, 0]; // da lunedì a domenica
+const isoDi = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const daIso = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); };
 // "2026-12-20" → "Domenica 20 Dicembre"
 const dataLunga = (iso: string) => {
-  const [y, m, d] = iso.split("-").map(Number);
-  return `${GIORNI_LUNGHI[new Date(y, m - 1, d).getDay()]} ${d} ${MESI_IT[m - 1]}`;
+  const d = daIso(iso);
+  return `${GIORNI_LUNGHI[d.getDay()]} ${d.getDate()} ${MESI_IT[d.getMonth()]}`;
 };
-const oggiIso = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
+const dataBreve = (iso: string) => iso.split("-").reverse().join("/");
+const oggiIso = () => isoDi(new Date());
 // Esegue una chiamata JSON e lancia l'errore del backend (mostrato nel modale di conferma)
 const chiamata = async (fetchAuth: Props["fetchAuth"], url: string, options?: RequestInit) => {
   const res = await fetchAuth(url, options);
@@ -77,12 +78,74 @@ function Intestazione({ icona, titolo, sotto }: { icona: React.ComponentProps<ty
   );
 }
 
-function BottoneOro({ icona, testo, onPress }: { icona: React.ComponentProps<typeof Ionicons>["name"]; testo: string; onPress: () => void }) {
+function BottoneOro({ icona, testo, onPress, inCorso = false }: { icona: React.ComponentProps<typeof Ionicons>["name"]; testo: string; onPress: () => void; inCorso?: boolean }) {
   return (
-    <Pressable style={({ pressed }) => [st.titBtnOro, pressed && { opacity: 0.85 }]} onPress={onPress}>
-      <Ionicons name={icona} size={18} color="#0A0A0A" />
+    <Pressable style={({ pressed }) => [st.titBtnOro, (pressed || inCorso) && { opacity: 0.85 }]} onPress={onPress} disabled={inCorso}>
+      {inCorso ? <ActivityIndicator color="#0A0A0A" /> : <Ionicons name={icona} size={18} color="#0A0A0A" />}
       <Text style={st.titBtnOroText}>{testo}</Text>
     </Pressable>
+  );
+}
+
+// Riga a tendina: in chiusura solo titolo e data, toccandola mostra il contenuto completo
+function RigaFisarmonica({ titolo, data, aperta, onTocca, children }: { titolo: string; data: string; aperta: boolean; onTocca: () => void; children: React.ReactNode }) {
+  return (
+    <View style={[st.consAcc, aperta && st.consAccAperta]}>
+      <Pressable style={st.consAccTesta} onPress={onTocca} role="button" aria-expanded={aperta}>
+        <Text style={st.consAccTitolo} numberOfLines={1}>{titolo}</Text>
+        <Text style={st.consAccData}>{data}</Text>
+        <Ionicons name={aperta ? "chevron-up" : "chevron-down"} size={16} color="#D4AF37" />
+      </Pressable>
+      {aperta && <View style={st.consAccCorpo}>{children}</View>}
+    </View>
+  );
+}
+
+// ── "Valido dal": da oggi oppure dal lunedì di una settimana futura ──
+// ‹ › settimana precedente/successiva, « » mese precedente/successivo (primo lunedì del mese)
+const prossimoLunedi = (d: Date) => { const x = new Date(d); x.setDate(x.getDate() + ((8 - x.getDay()) % 7 || 7)); return x; };
+const primoLunediDa = (d: Date) => { const x = new Date(d); while (x.getDay() !== 1) x.setDate(x.getDate() + 1); return x; };
+function SelettoreValidita({ valore, onCambia }: { valore: string; onCambia: (v: string) => void }) {
+  const oggi = oggiIso();
+  const limite = (d: Date) => { const iso = isoDi(d); return iso <= oggi ? oggi : iso; };
+  const sposta = (settimane: number) => {
+    if (settimane > 0 && valore === oggi) return onCambia(isoDi(prossimoLunedi(new Date())));
+    const d = daIso(valore);
+    d.setDate(d.getDate() + settimane * 7);
+    onCambia(limite(d));
+  };
+  const spostaMese = (n: number) => {
+    const d = daIso(valore);
+    onCambia(limite(primoLunediDa(new Date(d.getFullYear(), d.getMonth() + n, 1))));
+  };
+  const fine = valore === oggi ? null : (() => { const d = daIso(valore); d.setDate(d.getDate() + 6); return isoDi(d); })();
+  return (
+    <View style={st.consValidita}>
+      <Text style={st.mLabel}>VALIDO DAL</Text>
+      <View style={{ alignItems: "center", marginBottom: 12 }}>
+        <Text style={st.consMeseTesto}>{valore === oggi ? "Da oggi" : `Da ${dataLunga(valore)}`}</Text>
+        <Text style={st.consValiditaSotto}>{valore === oggi ? "La modifica vale subito" : `Settimana ${dataBreve(valore)} – ${dataBreve(fine!)} e seguenti`}</Text>
+      </View>
+      <View style={st.consMese}>
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          <Pressable onPress={() => spostaMese(-1)} style={st.consMeseFreccia} accessibilityLabel="Mese precedente" disabled={valore === oggi}>
+            <Ionicons name="play-back" size={14} color={valore === oggi ? "#444" : "#D4AF37"} />
+          </Pressable>
+          <Pressable onPress={() => sposta(-1)} style={st.consMeseFreccia} accessibilityLabel="Settimana precedente" disabled={valore === oggi}>
+            <Ionicons name="chevron-back" size={18} color={valore === oggi ? "#444" : "#D4AF37"} />
+          </Pressable>
+        </View>
+        <Text style={st.consValiditaSotto}>settimana · mese</Text>
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          <Pressable onPress={() => sposta(1)} style={st.consMeseFreccia} accessibilityLabel="Settimana successiva">
+            <Ionicons name="chevron-forward" size={18} color="#D4AF37" />
+          </Pressable>
+          <Pressable onPress={() => spostaMese(1)} style={st.consMeseFreccia} accessibilityLabel="Mese successivo">
+            <Ionicons name="play-forward" size={14} color="#D4AF37" />
+          </Pressable>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -90,10 +153,12 @@ function BottoneOro({ icona, testo, onPress }: { icona: React.ComponentProps<typ
 function SezioneComunicazioni({ sedi, fetchAuth, msg, chiediConferma }: Props) {
   const [comTitolo, setComTitolo] = useState("");
   const [comTesto, setComTesto] = useState("");
-  const [comSede, setComSede] = useState<number | null>(null); // null = tutti i clienti
+  // null = tutti i clienti; id sede = clienti con appuntamenti futuri in quella sede
+  const [comSede, setComSede] = useState<number | null>(null);
   const [nDestinatari, setNDestinatari] = useState<number | null>(null);
   const [emailAttiva, setEmailAttiva] = useState(false);
   const [storico, setStorico] = useState<any[]>([]);
+  const [aperta, setAperta] = useState<number | null>(null);
 
   const caricaStorico = async () => {
     try {
@@ -112,14 +177,16 @@ function SezioneComunicazioni({ sedi, fetchAuth, msg, chiediConferma }: Props) {
       .catch(() => {});
   }, [comSede]);
 
+  const nomeSede = (id: number | null) => sedi.find((s) => s.id === id)?.nome || "";
   const inviaComunicazione = () => {
     if (!comTitolo.trim()) return msg("Inserisci il titolo");
     if (!comTesto.trim()) return msg("Scrivi il messaggio");
-    if (!nDestinatari) return msg("Nessun cliente destinatario");
+    if (!nDestinatari) return msg(comSede ? `Nessun cliente con appuntamenti futuri a ${nomeSede(comSede)}` : "Nessun cliente destinatario");
     chiediConferma({
       icona: "megaphone-outline",
       testoConferma: "Sì, invia",
-      messaggio: `Inviare «${comTitolo.trim()}» a ${nDestinatari} ${nDestinatari === 1 ? "cliente" : "clienti"}?`
+      messaggio: `Inviare «${comTitolo.trim()}» a ${nDestinatari} ${nDestinatari === 1 ? "cliente" : "clienti"}`
+        + (comSede ? ` con appuntamenti futuri a ${nomeSede(comSede)}?` : "?")
         + (emailAttiva ? "\n\nLo riceveranno in app e via email." : "\n\nLo riceveranno in app (email non ancora configurata)."),
       azione: async () => {
         const d = await chiamata(fetchAuth, `${BACKEND_URL}/api/admin/comunicazioni`, {
@@ -139,18 +206,19 @@ function SezioneComunicazioni({ sedi, fetchAuth, msg, chiediConferma }: Props) {
       <Intestazione icona="megaphone-outline" titolo="Comunicazioni ai clienti" sotto="Arrivano nella sezione Messaggi dell'app e via email." />
 
       <Text style={st.mLabel}>DESTINATARI</Text>
-      <View style={[st.mGrid, { marginBottom: 6, flexWrap: "wrap" }]}>
+      <View style={{ gap: 8, marginBottom: 8 }}>
         <Pressable style={[st.mChip, comSede === null && st.mChipA]} onPress={() => setComSede(null)}>
           <Text style={[st.mChipText, comSede === null && st.mChipTextA]}>Tutti i clienti</Text>
         </Pressable>
         {sedi.map((s) => (
           <Pressable key={s.id} style={[st.mChip, comSede === s.id && st.mChipA]} onPress={() => setComSede(s.id)}>
-            <Text style={[st.mChipText, comSede === s.id && st.mChipTextA]}>Clienti di {s.nome}</Text>
+            <Text style={[st.mChipText, comSede === s.id && st.mChipTextA]}>Clienti con appuntamenti futuri a {s.nome}</Text>
           </Pressable>
         ))}
       </View>
       <Text style={st.titCardSub}>
         {nDestinatari === null ? "Calcolo dei destinatari…" : `${nDestinatari} ${nDestinatari === 1 ? "cliente riceverà" : "clienti riceveranno"} il messaggio`}
+        {comSede ? ` (solo chi ha un appuntamento da oggi in poi a ${nomeSede(comSede)})` : ""}
       </Text>
 
       <Text style={[st.mLabel, { marginTop: 14 }]}>TITOLO</Text>
@@ -180,17 +248,25 @@ function SezioneComunicazioni({ sedi, fetchAuth, msg, chiediConferma }: Props) {
       {storico.length > 0 && (
         <>
           <Text style={[st.mLabel, { marginTop: 22 }]}>INVIATE DI RECENTE</Text>
-          {storico.slice(0, 10).map((c) => (
-            <View key={c.id} style={st.titRiga}>
-              <View style={{ flex: 1 }}>
-                <Text style={st.titRigaTitolo} numberOfLines={1}>{c.titolo}</Text>
-                <Text style={st.titRigaSub}>
-                  {new Date(c.created_at).toLocaleDateString("it-IT", { day: "numeric", month: "short" })} · {c.destinatari} {c.destinatari === 1 ? "cliente" : "clienti"}
-                  {c.email_inviate > 0 ? ` · ${c.email_inviate} email` : ""}
-                  {c.email_fallite > 0 ? ` · ${c.email_fallite} non consegnate` : ""}
-                </Text>
-              </View>
-            </View>
+          {storico.slice(0, 15).map((c) => (
+            <RigaFisarmonica
+              key={c.id}
+              titolo={c.titolo}
+              data={new Date(c.created_at).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" })}
+              aperta={aperta === c.id}
+              onTocca={() => setAperta(aperta === c.id ? null : c.id)}
+            >
+              <Text style={st.consAccTesto}>{String(c.messaggio).replace(/\*\*/g, "")}</Text>
+              <Text style={st.consAccDettaglio}>
+                Inviata il {new Date(c.created_at).toLocaleString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              </Text>
+              <Text style={st.consAccDettaglio}>
+                Destinatari: {c.destinatari} {c.destinatari === 1 ? "cliente" : "clienti"}{c.sede_id ? ` con appuntamenti futuri a ${nomeSede(c.sede_id)}` : ""}
+              </Text>
+              <Text style={st.consAccDettaglio}>
+                Email: {c.email_inviate > 0 ? `${c.email_inviate} consegnate` : "nessuna inviata"}{c.email_fallite > 0 ? ` · ${c.email_fallite} non consegnate` : ""}
+              </Text>
+            </RigaFisarmonica>
           ))}
         </>
       )}
@@ -208,7 +284,7 @@ function SezioneAperture({ sedi, elencoBarbieri, aperture, fetchAuth, msg, onApe
   const [apFine, setApFine] = useState("18:00");
   const [apBarbieri, setApBarbieri] = useState<number[]>([]);
   const [apAvvisa, setApAvvisa] = useState(true);
-  // Selezionabili solo i giorni di chiusura della sede scelta (secondo l'orario standard)
+  // Selezionabili solo i giorni di chiusura della sede scelta (orario in vigore; il backend verifica la data esatta)
   const giorniAperti = orari.filter((o) => o.sede_id === apSede && o.fasce.length > 0).map((o) => o.giorno_settimana);
   const giorniChiusi = [0, 1, 2, 3, 4, 5, 6].filter((g) => !giorniAperti.includes(g));
 
@@ -327,29 +403,77 @@ function SezioneAperture({ sedi, elencoBarbieri, aperture, fetchAuth, msg, onApe
   );
 }
 
-// ═══ ORARI STANDARD DELLE SEDI ═══
-function SezioneOrari({ sedi, fetchAuth, msg, chiediConferma, orari, onOrari }: Props & { orari: OrarioGiorno[]; onOrari: () => void }) {
+// Elenco delle modifiche programmate (non ancora in vigore) con "Annulla"
+function Programmate({ voci, onAnnulla }: { voci: { valido_dal: string; riepilogo: string }[]; onAnnulla: (validoDal: string) => void }) {
+  if (voci.length === 0) return null;
+  return (
+    <View style={{ marginTop: 18 }}>
+      <Text style={st.mLabel}>MODIFICHE PROGRAMMATE</Text>
+      {voci.map((v) => (
+        <View key={v.valido_dal} style={st.titRiga}>
+          <View style={{ flex: 1 }}>
+            <Text style={st.titRigaTitolo}>Dal {dataLunga(v.valido_dal)}</Text>
+            <Text style={st.titRigaSub} numberOfLines={2}>{v.riepilogo}</Text>
+          </View>
+          <Pressable style={st.absBtn} onPress={() => onAnnulla(v.valido_dal)}>
+            <Text style={st.absBtnText}>Annulla</Text>
+          </Pressable>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// ═══ ORARI DELLE SEDI (programmabili) ═══
+function SezioneOrari({ sedi, fetchAuth, msg, chiediConferma, onOrari }: Props & { onOrari: () => void }) {
   const [sede, setSede] = useState<number>(sedi[0]?.id ?? 0);
-  const [bozza, setBozza] = useState<Record<number, Fascia[]>>({});
-  // La bozza riparte dall'orario salvato a ogni cambio di sede o dopo un salvataggio
+  const [validoDal, setValidoDal] = useState(oggiIso());
+  const [bozza, setBozza] = useState<Record<number, Fascia[]> | null>(null);
+  const [programmate, setProgrammate] = useState<{ valido_dal: string; riepilogo: string }[]>([]);
+  const [ricarica, setRicarica] = useState(0);
+
+  // La bozza parte dall'orario che sarà in vigore alla data scelta
   useEffect(() => {
-    const b: Record<number, Fascia[]> = {};
-    for (let g = 0; g <= 6; g++) b[g] = (orari.find((o) => o.sede_id === sede && o.giorno_settimana === g)?.fasce || []).map((f) => ({ ...f }));
-    setBozza(b);
-  }, [sede, orari]);
+    setBozza(null);
+    fetch(`${BACKEND_URL}/api/orari-sedi?sede_id=${sede}&data=${validoDal}`)
+      .then((r) => r.json())
+      .then((l: OrarioGiorno[]) => {
+        const b: Record<number, Fascia[]> = {};
+        for (let g = 0; g <= 6; g++) b[g] = (l.find((o) => o.giorno_settimana === g)?.fasce || []).map((f) => ({ ...f }));
+        setBozza(b);
+      })
+      .catch(() => setBozza({ 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }));
+    fetch(`${BACKEND_URL}/api/orari-sedi/versioni?sede_id=${sede}`)
+      .then((r) => r.json())
+      .then((l) => {
+        if (!Array.isArray(l)) return;
+        setProgrammate(l.filter((v: any) => v.valido_dal > oggiIso()).map((v: any) => ({
+          valido_dal: v.valido_dal,
+          riepilogo: ORDINE_SETTIMANA.map((g) => {
+            const f = v.giorni.find((x: any) => x.giorno_settimana === g)?.fasce || [];
+            return `${GIORNI_LUNGHI[g].slice(0, 3)} ${f.length ? f.map((x: Fascia) => `${x.inizio}–${x.fine}`).join(", ") : "chiuso"}`;
+          }).join(" · "),
+        })));
+      })
+      .catch(() => {});
+  }, [sede, validoDal, ricarica]);
 
   const cambiaFascia = (g: number, i: number, campo: keyof Fascia, valore: string) =>
-    setBozza((b) => ({ ...b, [g]: b[g].map((f, j) => (j === i ? { ...f, [campo]: valore } : f)) }));
+    setBozza((b) => b && ({ ...b, [g]: b[g].map((f, j) => (j === i ? { ...f, [campo]: valore } : f)) }));
   const aggiungiFascia = (g: number) =>
     setBozza((b) => {
+      if (!b) return b;
       const ultima = b[g][b[g].length - 1];
       const nuova = ultima ? { inizio: ultima.fine, fine: ultima.fine < "20:00" ? "20:00" : "22:00" } : { inizio: "09:00", fine: "19:00" };
       return { ...b, [g]: [...b[g], nuova] };
     });
-  const togliFascia = (g: number, i: number) => setBozza((b) => ({ ...b, [g]: b[g].filter((_, j) => j !== i) }));
-  const apriChiudi = (g: number, aperto: boolean) => setBozza((b) => ({ ...b, [g]: aperto ? [{ inizio: "09:00", fine: "19:00" }] : [] }));
+  const togliFascia = (g: number, i: number) => setBozza((b) => b && ({ ...b, [g]: b[g].filter((_, j) => j !== i) }));
+  const apriChiudi = (g: number, aperto: boolean) => setBozza((b) => b && ({ ...b, [g]: aperto ? [{ inizio: "09:00", fine: "19:00" }] : [] }));
 
+  const nomeSede = sedi.find((s) => s.id === sede)?.nome || "";
+  const quando = validoDal === oggiIso() ? "da oggi" : `da ${dataLunga(validoDal)}`;
   const salva = () => {
+    if (!bozza) return;
     for (const g of ORDINE_SETTIMANA) {
       const fasce = [...(bozza[g] || [])].sort((a, b) => a.inizio.localeCompare(b.inizio));
       for (let i = 0; i < fasce.length; i++) {
@@ -357,23 +481,37 @@ function SezioneOrari({ sedi, fetchAuth, msg, chiediConferma, orari, onOrari }: 
         if (i > 0 && minutiDa(fasce[i].inizio) < minutiDa(fasce[i - 1].fine)) return msg(`${GIORNI_LUNGHI[g]}: le fasce si sovrappongono`);
       }
     }
-    const nome = sedi.find((s) => s.id === sede)?.nome || "";
     const riepilogo = ORDINE_SETTIMANA.map((g) => `${GIORNI_LUNGHI[g].slice(0, 3)}: ${bozza[g]?.length ? bozza[g].map((f) => `${f.inizio}–${f.fine}`).join(", ") : "chiuso"}`).join("\n");
     chiediConferma({
       icona: "time-outline",
       testoConferma: "Sì, salva",
-      messaggio: `Salvare il nuovo orario di ${nome}?\n\n${riepilogo}\n\nVale da subito per le nuove prenotazioni; quelle già prese restano valide.`,
+      messaggio: `Salvare il nuovo orario di ${nomeSede}, valido ${quando}?\n\n${riepilogo}\n\n`
+        + (validoDal === oggiIso() ? "Vale subito per le nuove prenotazioni." : "Fino ad allora i clienti vedono l'orario attuale.")
+        + " Gli appuntamenti già presi restano validi.",
       azione: async () => {
-        const d = await chiamata(fetchAuth, `${BACKEND_URL}/api/admin/orari-sedi/${sede}`, { method: "PUT", body: JSON.stringify({ giorni: bozza }) });
+        const d = await chiamata(fetchAuth, `${BACKEND_URL}/api/admin/orari-sedi/${sede}`, { method: "PUT", body: JSON.stringify({ valido_dal: validoDal, giorni: bozza }) });
+        setRicarica((n) => n + 1);
         onOrari();
         return d.messaggio;
       },
     });
   };
+  const annullaProgrammata = (vd: string) =>
+    chiediConferma({
+      icona: "close-circle-outline",
+      testoConferma: "Sì, annulla",
+      messaggio: `Annullare l'orario di ${nomeSede} programmato da ${dataLunga(vd)}?\n\nResterà in vigore l'orario precedente.`,
+      azione: async () => {
+        const d = await chiamata(fetchAuth, `${BACKEND_URL}/api/admin/orari-sedi/${sede}/versioni/${vd}`, { method: "DELETE" });
+        setRicarica((n) => n + 1);
+        onOrari();
+        return d.messaggio;
+      },
+    });
 
   return (
     <View style={st.titCard}>
-      <Intestazione icona="time-outline" titolo="Orari delle sedi" sotto="Orario standard di apertura e chiusura, giorno per giorno. Un giorno chiuso si può sbloccare con un'apertura straordinaria." />
+      <Intestazione icona="time-outline" titolo="Orari delle sedi" sotto="Orario standard di apertura e chiusura, giorno per giorno. Puoi programmarlo da una data futura." />
 
       <Text style={st.mLabel}>SEDE</Text>
       <View style={[st.mGrid, { marginBottom: 14 }]}>
@@ -384,63 +522,72 @@ function SezioneOrari({ sedi, fetchAuth, msg, chiediConferma, orari, onOrari }: 
         ))}
       </View>
 
-      {ORDINE_SETTIMANA.map((g) => {
-        const fasce = bozza[g] || [];
-        const aperto = fasce.length > 0;
-        return (
-          <View key={g} style={st.consGiorno}>
-            <View style={st.consGiornoTesta}>
-              <Text style={[st.consGiornoNome, !aperto && { color: "#666" }]}>{GIORNI_LUNGHI[g]}</Text>
-              <View style={{ flexDirection: "row", gap: 6 }}>
-                <Pressable style={[st.consPill, aperto && st.consPillA]} onPress={() => !aperto && apriChiudi(g, true)}>
-                  <Text style={[st.consPillText, aperto && st.consPillTextA]}>Aperto</Text>
-                </Pressable>
-                <Pressable style={[st.consPill, !aperto && st.consPillChiuso]} onPress={() => aperto && apriChiudi(g, false)}>
-                  <Text style={[st.consPillText, !aperto && st.consPillTextChiuso]}>Chiuso</Text>
-                </Pressable>
-              </View>
-            </View>
-            {fasce.map((f, i) => (
-              <View key={i} style={st.consFascia}>
-                <View style={{ flex: 1 }}><OrarioInline value={f.inizio} onChange={(v) => cambiaFascia(g, i, "inizio", v)} marginBottom={0} /></View>
-                <Text style={{ color: "#555", fontSize: 13 }}>–</Text>
-                <View style={{ flex: 1 }}><OrarioInline value={f.fine} onChange={(v) => cambiaFascia(g, i, "fine", v)} marginBottom={0} /></View>
-                <Pressable onPress={() => togliFascia(g, i)} style={st.consTogli} accessibilityLabel={`Togli fascia ${GIORNI_LUNGHI[g]}`}>
-                  <Ionicons name="close" size={16} color="#888" />
-                </Pressable>
-              </View>
-            ))}
-            {aperto && fasce.length < 3 && (
-              <Pressable onPress={() => aggiungiFascia(g)} style={st.consAggiungi}>
-                <Ionicons name="add" size={15} color="#D4AF37" />
-                <Text style={st.consAggiungiText}>Aggiungi fascia (es. pausa pranzo)</Text>
-              </Pressable>
-            )}
-          </View>
-        );
-      })}
+      <SelettoreValidita valore={validoDal} onCambia={setValidoDal} />
 
-      <BottoneOro icona="save-outline" testo="Salva orario" onPress={salva} />
+      {!bozza ? (
+        <ActivityIndicator color="#D4AF37" style={{ marginVertical: 20 }} />
+      ) : (
+        ORDINE_SETTIMANA.map((g) => {
+          const fasce = bozza[g] || [];
+          const aperto = fasce.length > 0;
+          return (
+            <View key={g} style={st.consGiorno}>
+              <View style={st.consGiornoTesta}>
+                <Text style={[st.consGiornoNome, !aperto && { color: "#666" }]}>{GIORNI_LUNGHI[g]}</Text>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  <Pressable style={[st.consPill, aperto && st.consPillA]} onPress={() => !aperto && apriChiudi(g, true)}>
+                    <Text style={[st.consPillText, aperto && st.consPillTextA]}>Aperto</Text>
+                  </Pressable>
+                  <Pressable style={[st.consPill, !aperto && st.consPillChiuso]} onPress={() => aperto && apriChiudi(g, false)}>
+                    <Text style={[st.consPillText, !aperto && st.consPillTextChiuso]}>Chiuso</Text>
+                  </Pressable>
+                </View>
+              </View>
+              {fasce.map((f, i) => (
+                <View key={i} style={st.consFascia}>
+                  <View style={{ flex: 1 }}><OrarioInline value={f.inizio} onChange={(v) => cambiaFascia(g, i, "inizio", v)} marginBottom={0} /></View>
+                  <Text style={{ color: "#555", fontSize: 13 }}>–</Text>
+                  <View style={{ flex: 1 }}><OrarioInline value={f.fine} onChange={(v) => cambiaFascia(g, i, "fine", v)} marginBottom={0} /></View>
+                  <Pressable onPress={() => togliFascia(g, i)} style={st.consTogli} accessibilityLabel={`Togli fascia ${GIORNI_LUNGHI[g]}`}>
+                    <Ionicons name="close" size={16} color="#888" />
+                  </Pressable>
+                </View>
+              ))}
+              {aperto && fasce.length < 3 && (
+                <Pressable onPress={() => aggiungiFascia(g)} style={st.consAggiungi}>
+                  <Ionicons name="add" size={15} color="#D4AF37" />
+                  <Text style={st.consAggiungiText}>Aggiungi fascia (es. pausa pranzo)</Text>
+                </Pressable>
+              )}
+            </View>
+          );
+        })
+      )}
+
+      <BottoneOro icona="save-outline" testo={validoDal === oggiIso() ? "Salva orario (da oggi)" : `Programma dal ${dataBreve(validoDal)}`} onPress={salva} />
+      <Programmate voci={programmate} onAnnulla={annullaProgrammata} />
     </View>
   );
 }
 
-// ═══ TURNI FISSI DEI BARBIERI ═══
+// ═══ TURNI FISSI DEI BARBIERI (programmabili) ═══
 function SezioneTurni({ sedi, fetchAuth, chiediConferma }: Props) {
+  const [validoDal, setValidoDal] = useState(oggiIso());
   const [barbieri, setBarbieri] = useState<any[]>([]);
   const [scelto, setScelto] = useState<number | null>(null);
   const [bozza, setBozza] = useState<Record<number, number | null>>({});
-  const carica = async () => {
-    try {
-      const res = await fetchAuth(`${BACKEND_URL}/api/admin/turni`);
-      const d = await res.json();
-      if (Array.isArray(d)) {
+  const [ricarica, setRicarica] = useState(0);
+  // Turni in vigore alla data scelta (più le modifiche programmate di ogni barbiere)
+  useEffect(() => {
+    fetchAuth(`${BACKEND_URL}/api/admin/turni?data=${validoDal}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!Array.isArray(d)) return;
         setBarbieri(d);
         setScelto((s) => s ?? d[0]?.id ?? null);
-      }
-    } catch {}
-  };
-  useEffect(() => { carica(); }, []);
+      })
+      .catch(() => {});
+  }, [validoDal, ricarica]);
   useEffect(() => {
     const b = barbieri.find((x) => x.id === scelto);
     if (!b) return;
@@ -450,31 +597,47 @@ function SezioneTurni({ sedi, fetchAuth, chiediConferma }: Props) {
   }, [scelto, barbieri]);
 
   const nomeSede = (id: number | null) => (id ? sedi.find((s) => s.id === id)?.nome || "" : "Riposo");
+  const b = barbieri.find((x) => x.id === scelto);
+  const quando = validoDal === oggiIso() ? "da oggi" : `da ${dataLunga(validoDal)}`;
   const salva = () => {
-    const b = barbieri.find((x) => x.id === scelto);
     if (!b) return;
     const riepilogo = ORDINE_SETTIMANA.map((g) => `${GIORNI_LUNGHI[g].slice(0, 3)}: ${nomeSede(bozza[g] ?? null)}`).join("\n");
     chiediConferma({
       icona: "people-outline",
       testoConferma: "Sì, salva",
-      messaggio: `Salvare i turni di ${b.nome}?\n\n${riepilogo}\n\nValgono da subito per le nuove prenotazioni; quelle già prese restano valide.`,
+      messaggio: `Salvare i turni di ${b.nome}, validi ${quando}?\n\n${riepilogo}\n\n`
+        + (validoDal === oggiIso() ? "Valgono subito per le nuove prenotazioni." : "Fino ad allora restano i turni attuali.")
+        + " Gli appuntamenti già presi restano validi.",
       azione: async () => {
-        const d = await chiamata(fetchAuth, `${BACKEND_URL}/api/admin/turni/${b.id}`, { method: "PUT", body: JSON.stringify({ turni: bozza }) });
-        await carica();
+        const d = await chiamata(fetchAuth, `${BACKEND_URL}/api/admin/turni/${b.id}`, { method: "PUT", body: JSON.stringify({ valido_dal: validoDal, turni: bozza }) });
+        setRicarica((n) => n + 1);
         return d.messaggio;
       },
     });
   };
+  const annullaProgrammata = (vd: string) =>
+    b && chiediConferma({
+      icona: "close-circle-outline",
+      testoConferma: "Sì, annulla",
+      messaggio: `Annullare i turni di ${b.nome} programmati da ${dataLunga(vd)}?\n\nResteranno in vigore i turni precedenti.`,
+      azione: async () => {
+        const d = await chiamata(fetchAuth, `${BACKEND_URL}/api/admin/turni/${b.id}/versioni/${vd}`, { method: "DELETE" });
+        setRicarica((n) => n + 1);
+        return d.messaggio;
+      },
+    });
 
   return (
     <View style={st.titCard}>
-      <Intestazione icona="people-outline" titolo="Turni dello staff" sotto="Per ogni giorno della settimana, in quale sede lavora il barbiere (o se è a riposo)." />
+      <Intestazione icona="people-outline" titolo="Turni dello staff" sotto="Per ogni giorno della settimana, in quale sede lavora il barbiere (o se è a riposo). Puoi programmarli da una data futura." />
+
+      <SelettoreValidita valore={validoDal} onCambia={setValidoDal} />
 
       <Text style={st.mLabel}>BARBIERE</Text>
       <View style={[st.mGrid, { marginBottom: 14, flexWrap: "wrap" }]}>
-        {barbieri.map((b) => (
-          <Pressable key={b.id} style={[st.mChip, scelto === b.id && st.mChipA]} onPress={() => setScelto(b.id)}>
-            <Text style={[st.mChipText, scelto === b.id && st.mChipTextA]}>{b.nome}</Text>
+        {barbieri.map((x) => (
+          <Pressable key={x.id} style={[st.mChip, scelto === x.id && st.mChipA]} onPress={() => setScelto(x.id)}>
+            <Text style={[st.mChipText, scelto === x.id && st.mChipTextA]}>{x.nome}</Text>
           </Pressable>
         ))}
       </View>
@@ -494,7 +657,7 @@ function SezioneTurni({ sedi, fetchAuth, chiediConferma }: Props) {
                   <Pressable
                     key={String(id)}
                     style={[st.consPill, sel && (id === null ? st.consPillChiuso : st.consPillA)]}
-                    onPress={() => setBozza((b) => ({ ...b, [g]: id }))}
+                    onPress={() => setBozza((x) => ({ ...x, [g]: id }))}
                   >
                     <Text style={[st.consPillText, sel && (id === null ? st.consPillTextChiuso : st.consPillTextA)]}>{nomeSede(id)}</Text>
                   </Pressable>
@@ -505,21 +668,30 @@ function SezioneTurni({ sedi, fetchAuth, chiediConferma }: Props) {
         ))
       )}
 
-      <BottoneOro icona="save-outline" testo="Salva turni" onPress={salva} />
+      <BottoneOro icona="save-outline" testo={validoDal === oggiIso() ? "Salva turni (da oggi)" : `Programma dal ${dataBreve(validoDal)}`} onPress={salva} />
+      <Programmate
+        voci={(b?.programmati || []).map((p: any) => ({
+          valido_dal: p.valido_dal,
+          riepilogo: ORDINE_SETTIMANA.map((g) => `${GIORNI_LUNGHI[g].slice(0, 3)} ${nomeSede(p.turni?.[g] ?? null)}`).join(" · "),
+        }))}
+        onAnnulla={annullaProgrammata}
+      />
     </View>
   );
 }
 
-// ═══ ARCHIVIO OPERAZIONI + ESPORTA REPORT ═══
+// ═══ ARCHIVIO OPERAZIONI + REPORT PDF ═══
 function SezioneArchivio({ fetchAuth, msg }: Props) {
   const ora = new Date();
   const [anno, setAnno] = useState(ora.getFullYear());
   const [mese, setMese] = useState(ora.getMonth() + 1);
   const [righe, setRighe] = useState<any[] | null>(null);
+  const [aperta, setAperta] = useState<number | null>(null);
   const [esporto, setEsporto] = useState(false);
 
   useEffect(() => {
     setRighe(null);
+    setAperta(null);
     fetchAuth(`${BACKEND_URL}/api/admin/developer-logs?anno=${anno}&mese=${mese}`)
       .then((r) => r.json())
       .then((d) => setRighe(Array.isArray(d) ? d : []))
@@ -532,7 +704,7 @@ function SezioneArchivio({ fetchAuth, msg }: Props) {
     setMese(d.getMonth() + 1);
   };
 
-  // Scarica il CSV del mese: la richiesta porta il token, quindi il file passa da un blob locale
+  // Scarica il PDF del mese: la richiesta porta il token, quindi il file passa da un blob locale
   const esporta = async () => {
     if (Platform.OS !== "web") return msg("Esportazione disponibile dal browser");
     setEsporto(true);
@@ -543,7 +715,7 @@ function SezioneArchivio({ fetchAuth, msg }: Props) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `report-operazioni-${anno}-${String(mese).padStart(2, "0")}.csv`;
+      a.download = `report-operazioni-${anno}-${String(mese).padStart(2, "0")}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -558,7 +730,7 @@ function SezioneArchivio({ fetchAuth, msg }: Props) {
 
   return (
     <View style={st.titCard}>
-      <Intestazione icona="document-text-outline" titolo="Archivio operazioni" sotto="Registro automatico delle operazioni della console. Il report mensile documenta l'attività di manutenzione." />
+      <Intestazione icona="document-text-outline" titolo="Archivio operazioni" sotto="Registro automatico delle operazioni della console. Il report mensile in PDF documenta l'attività di manutenzione." />
 
       <View style={st.consMese}>
         <Pressable onPress={() => spostaMese(-1)} style={st.consMeseFreccia} accessibilityLabel="Mese precedente">
@@ -570,10 +742,9 @@ function SezioneArchivio({ fetchAuth, msg }: Props) {
         </Pressable>
       </View>
 
-      <Pressable style={({ pressed }) => [st.titBtnOro, { marginBottom: 16 }, (pressed || esporto) && { opacity: 0.8 }]} onPress={esporta} disabled={esporto}>
-        {esporto ? <ActivityIndicator color="#0A0A0A" /> : <Ionicons name="download-outline" size={18} color="#0A0A0A" />}
-        <Text style={st.titBtnOroText}>Esporta Report (CSV)</Text>
-      </Pressable>
+      <View style={{ marginBottom: 16 }}>
+        <BottoneOro icona="download-outline" testo="Esporta Report (PDF)" onPress={esporta} inCorso={esporto} />
+      </View>
 
       {righe === null ? (
         <ActivityIndicator color="#D4AF37" style={{ marginVertical: 20 }} />
@@ -583,13 +754,19 @@ function SezioneArchivio({ fetchAuth, msg }: Props) {
         <>
           <Text style={st.mLabel}>{righe.length} {righe.length === 1 ? "OPERAZIONE" : "OPERAZIONI"}</Text>
           {righe.map((r) => (
-            <View key={r.id} style={st.titRiga}>
-              <View style={{ flex: 1 }}>
-                <Text style={st.consLogTipo}>{r.azione_etichetta}</Text>
-                <Text style={st.titRigaTitolo}>{r.descrizione}</Text>
-                <Text style={st.titRigaSub}>{r.data.split("-").reverse().join("/")} · {r.ora}</Text>
-              </View>
-            </View>
+            <RigaFisarmonica
+              key={r.id}
+              titolo={r.azione_etichetta}
+              data={dataBreve(r.data)}
+              aperta={aperta === r.id}
+              onTocca={() => setAperta(aperta === r.id ? null : r.id)}
+            >
+              <Text style={st.consAccTesto}>{r.descrizione}</Text>
+              {(r.righe || []).map((x: string, i: number) => (
+                <Text key={i} style={st.consAccDettaglio}>{x}</Text>
+              ))}
+              <Text style={st.consAccDettaglio}>Registrata il {dataBreve(r.data)} alle {r.ora}</Text>
+            </RigaFisarmonica>
           ))}
         </>
       )}
@@ -607,6 +784,7 @@ const SEZIONI = [
 
 export default function ConsoleDeveloper(props: Props) {
   const [sezione, setSezione] = useState<(typeof SEZIONI)[number]["id"]>("comunicazioni");
+  // Orario in vigore oggi: serve alle aperture straordinarie (quali giorni sono di chiusura)
   const [orari, setOrari] = useState<OrarioGiorno[]>([]);
   const caricaOrari = async () => {
     try {
@@ -637,7 +815,7 @@ export default function ConsoleDeveloper(props: Props) {
 
       {sezione === "comunicazioni" && <SezioneComunicazioni {...props} />}
       {sezione === "aperture" && <SezioneAperture {...props} orari={orari} />}
-      {sezione === "orari" && <SezioneOrari {...props} orari={orari} onOrari={caricaOrari} />}
+      {sezione === "orari" && <SezioneOrari {...props} onOrari={caricaOrari} />}
       {sezione === "turni" && <SezioneTurni {...props} />}
       {sezione === "archivio" && <SezioneArchivio {...props} />}
     </View>
